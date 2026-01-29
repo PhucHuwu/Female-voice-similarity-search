@@ -1,193 +1,140 @@
-# Hệ thống Tìm kiếm Giọng nói Phụ nữ dựa trên Độ tương đồng
+# Female Voice Similarity Search
 
-Hệ thống tìm kiếm âm thanh giọng nói phụ nữ sử dụng **similarity search** với vector embeddings. Hệ thống nhận đầu vào là file âm thanh giọng phụ nữ, trả về 5 file âm thanh tương đồng nhất theo thứ tự giảm dần.
+A voice similarity search system that finds similar female voices using audio feature extraction and vector similarity search with FAISS.
 
-## 🎯 Tính năng
+## Overview
 
-- Thu thập dataset giọng nói phụ nữ (HuggingFace, YouTube)
-- Trích xuất 52 đặc trưng âm thanh (MFCC, pitch, spectral, temporal, chroma)
-- Lưu trữ vector embeddings với FAISS
-- Tìm kiếm similarity với độ chính xác cao
-- Giao diện web Streamlit đẹp mắt, dễ sử dụng
-- Hiển thị dạng sóng âm thanh
+This system allows users to upload a female voice audio file and find the top 5 most similar voices from a database of 500+ pre-processed audio samples. The similarity is calculated using advanced audio features including MFCC, pitch, spectral characteristics, and more.
 
-## 🛠️ Tech Stack
+## Features
 
-- **Backend:** Python 3.10+
-- **Frontend:** Streamlit
-- **Audio Processing:** librosa, soundfile, pydub
-- **Vector DB:** FAISS (local, miễn phí)
-- **Feature Extraction:** MFCC, Pitch (F0), Spectral features, ZCR, RMS Energy, Chroma
-- **Environment:** Conda
+- Audio feature extraction (52 features including MFCC, Pitch, Spectral, Temporal, and Chroma)
+- FAISS-based vector similarity search
+- Interactive Streamlit web interface
+- Advanced audio analysis and visualization
+- Feature comparison and insights
 
-## 📦 Cài đặt
+## Tech Stack
 
-### 1. Tạo Conda Environment
+- **Python 3.10+** - Core programming language
+- **Streamlit** - Web interface
+- **librosa** - Audio processing and feature extraction
+- **FAISS** - Vector similarity search
+- **NumPy/Pandas** - Data manipulation
+- **Matplotlib/Plotly** - Visualization
+
+## Installation
+
+### Option 1: Using Conda (Recommended)
 
 ```bash
+# Create and activate conda environment
 conda env create -f environment.yml
 conda activate voice-search
 ```
 
-Hoặc sử dụng pip:
+### Option 2: Using pip
 
 ```bash
-conda create -n voice-search python=3.10 -y
-conda activate voice-search
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 2. Cấu trúc thư mục
+## Quick Start
 
-Project sẽ tự động tạo các thư mục cần thiết khi chạy scripts.
+### 1. Setup Environment
 
-```
-Female-voice-similarity-search/
-├── data/
-│   ├── raw/              # Audio files gốc
-│   └── processed/        # Audio đã xử lý
-├── database/
-│   ├── vectors/          # FAISS index
-│   ├── features.npy      # Feature vectors
-│   └── index_mapping.json
-├── src/                  # Source code modules
-├── app/                  # Streamlit app
-└── scripts/              # Build scripts
-```
-
-## 🚀 Hướng dẫn sử dụng
-
-### Bước 1: Thu thập dữ liệu
+Activate the conda environment:
 
 ```bash
-# Download 50 sample audio files từ Mozilla Common Voice
+conda activate voice-search
+```
+
+### 2. Build Database
+
+Build the FAISS database from audio files by running these Python scripts in order:
+
+```bash
+# Step 1: Download and chunk audio files
 python src/data_collection/download_audio.py
-```
 
-**Hoặc** để download nhiều hơn, chỉnh sửa trong file:
-
-```python
-download_sample_dataset(num_samples=500)  # Tải 500 files
-```
-
-### Bước 2: Tiền xử lý audio
-
-```bash
-# Chuẩn hóa audio: 16kHz, 3 giây, trim silence
+# Step 2: Preprocess audio (normalize, trim, resample to 16kHz)
 python src/data_collection/preprocess_audio.py
-```
 
-### Bước 3: Build database
-
-```bash
-# Trích xuất features và tạo FAISS index
+# Step 3: Extract features and build FAISS index
 python scripts/build_database.py
 ```
 
-Output:
-
-- `database/features.npy` - Feature vectors (N × 52)
-- `database/index_mapping.json` - Mapping vector ID → file path
-- `database/vectors/faiss_index.bin` - FAISS index
-
-### Bước 4: Chạy Streamlit app
+### 3. Run the Application
 
 ```bash
 streamlit run app/streamlit_app.py
 ```
 
-Mở trình duyệt tại `http://localhost:8501`
+The application will be available at `http://localhost:8501`
 
-## Đặc trưng âm thanh (52 dimensions)
+## Project Structure
 
-| Feature      | Số chiều | Mô tả                                        |
-| ------------ | -------- | -------------------------------------------- |
-| **MFCC**     | 26       | Mel-Frequency Cepstral Coefficients (timbre) |
-| **Pitch**    | 4        | Fundamental frequency (mean, std, min, max)  |
-| **Spectral** | 6        | Centroid, Rolloff, Bandwidth (mean + std)    |
-| **Temporal** | 4        | Zero Crossing Rate, RMS Energy (mean + std)  |
-| **Chroma**   | 12       | 12 pitch class energy distribution           |
-
-**Tổng:** 52 features
-
-## 🎨 Sử dụng Streamlit App
-
-1. **Tải lên file âm thanh** giọng phụ nữ (WAV, MP3, FLAC)
-2. **Chọn số kết quả** (1-10, mặc định 5)
-3. **Xem kết quả:**
-    - Top-5 giọng nói tương đồng nhất
-    - Độ tương đồng (0-100%)
-    - Audio player cho từng kết quả
-    - Dạng sóng âm thanh (waveform)
-
-## 📖 Cấu trúc Code
-
-### Core Modules
-
-- **`src/utils/audio_utils.py`** - Audio I/O, preprocessing utilities
-- **`src/feature_extraction/extractor.py`** - Feature extraction class
-- **`src/vector_database/faiss_manager.py`** - FAISS index management
-- **`src/search/similarity_search.py`** - Search pipeline
-- **`app/streamlit_app.py`** - Web UI
-
-### Scripts
-
-- **`src/data_collection/download_audio.py`** - Download dataset
-- **`src/data_collection/preprocess_audio.py`** - Audio preprocessing
-- **`scripts/build_database.py`** - Build FAISS database
-
-## Tùy chỉnh
-
-### Thay đổi feature extraction
-
-Chỉnh sửa `src/feature_extraction/features_config.py`:
-
-```python
-N_MFCC = 20  # Tăng số MFCC coefficients
-SAMPLE_RATE = 22050  # Thay đổi sample rate
-TARGET_DURATION = 5.0  # Audio dài hơn
+```
+Female-voice-similarity-search/
+├── app/                    # Streamlit web application
+├── data/                   # Audio dataset
+│   ├── raw/               # Original full-length audio files
+│   ├── chunks/            # Segmented audio chunks
+│   └── processed/         # Preprocessed audio ready for feature extraction
+├── database/              # FAISS index and feature vectors
+├── src/                   # Source code
+│   ├── data_collection/   # Audio download and preprocessing
+│   ├── feature_extraction/# Audio feature extraction
+│   ├── search/            # Similarity search implementation
+│   ├── utils/             # Utility functions
+│   └── vector_database/   # FAISS database management
+├── scripts/               # Build and utility scripts
+├── tests/                 # Unit tests
+└── docs/                  # Documentation
 ```
 
-### Thay đổi vector database
+## How It Works
 
-Thay FAISS bằng Pinecone (cloud):
+1. **Audio Preprocessing**: Audio files are normalized, trimmed of silence, and resampled to 16kHz
+2. **Feature Extraction**: 52 audio features are extracted from each file:
+    - MFCC (Mel-Frequency Cepstral Coefficients) - 26 features
+    - Pitch (F0) - 4 features
+    - Spectral features (Centroid, Rolloff, Bandwidth) - 6 features
+    - Temporal features (ZCR, RMS Energy) - 4 features
+    - Chroma features - 12 features
+3. **Vector Database**: Features are stored in a FAISS index for fast similarity search
+4. **Search**: When a query audio is uploaded, its features are extracted and compared against the database using L2 distance
+5. **Results**: The top 5 most similar voices are returned with similarity scores
 
-- Uncomment code trong `src/vector_database/pinecone_manager.py`
-- Thêm API key vào `.env`
+## Usage
 
-## 📈 Đánh giá kết quả
+1. Launch the Streamlit application
+2. Upload a female voice audio file (WAV, MP3, or FLAC format)
+3. View the top 5 similar voices with:
+    - Audio playback
+    - Waveform visualization
+    - Similarity scores
+    - Feature analysis and comparison
 
-Chạy manual evaluation:
+## Testing
 
-```python
-# Test với 10 query samples
-from src.search.similarity_search import search_similar
+Run tests:
 
-results = search_similar("path/to/test_audio.wav", top_k=5)
-for file_path, similarity, distance in results:
-    print(f"{file_path}: {similarity:.1f}%")
+```bash
+pytest tests/
 ```
 
-## 🐛 Troubleshooting
+## Requirements
 
-**Lỗi: "Index file not found"**
-→ Chạy `python scripts/build_database.py` trước
+- Python 3.10 or higher
+- At least 2GB of RAM
+- Approximately 1GB of disk space for the database
 
-**Lỗi: "No audio files found"**
-→ Chạy data collection và preprocessing trước
+## Dependencies
 
-**Lỗi: librosa import error**
-→ Cài đặt lại: `pip install librosa soundfile`
-
-## 📚 Tài liệu tham khảo
-
-- [Plan chi tiết](voice-similarity-search.md)
-- [Yêu cầu đề bài](require.md)
-
-## 🤝 Đóng góp
-
-Dự án học thuật - Voice Similarity Search System
-
-## 📄 License
-
-MIT License
+See `requirements.txt` for the complete list of dependencies.
