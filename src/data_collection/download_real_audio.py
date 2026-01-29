@@ -116,17 +116,17 @@ def download_youtube_samples():
                     title = info.get('title', 'Unknown')
                     duration = info.get('duration', 0)
                     
-                    print(f"✓ Downloaded: {title} ({duration}s)")
+                    print(f"Downloaded: {title} ({duration}s)")
                     count += 1
                 else:
-                    print(f"✗ Failed: No info returned")
+                    print(f"Failed: No info returned")
                     failed.append(url)
                 
         except yt_dlp.utils.DownloadError as e:
-            print(f"✗ Download error: {str(e)[:100]}")
+            print(f"Download error: {str(e)[:100]}")
             failed.append(url)
         except Exception as e:
-            print(f"✗ Unexpected error: {str(e)[:100]}")
+            print(f"Unexpected error: {str(e)[:100]}")
             failed.append(url)
     
     print("\n" + "="*60)
@@ -146,10 +146,6 @@ def download_youtube_samples():
 
 def main():
     """Main function"""
-    print("\n" + "="*60)
-    print("REAL VOICE DATA DOWNLOAD OPTIONS")
-    print("="*60)
-
     download_youtube_samples()
 
 if __name__ == "__main__":
