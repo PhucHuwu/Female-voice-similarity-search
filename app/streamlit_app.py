@@ -61,7 +61,7 @@ st.markdown("---")
 
 # Sidebar - System Info
 with st.sidebar:
-    st.header("📊 Thông tin Hệ thống")
+    st.header("Thông tin Hệ thống")
     
     if st.session_state.system_ready:
         stats = st.session_state.search_system.get_system_stats()
@@ -69,7 +69,7 @@ with st.sidebar:
         st.metric("Số chiều đặc trưng", stats.get('feature_dimension', 0))
         st.info(f"**Database:** {stats.get('index_type', 'N/A')}")
     else:
-        st.error("⚠️ Hệ thống chưa sẵn sàng")
+        st.error("Hệ thống chưa sẵn sàng")
         st.write(st.session_state.get('error_message', 'Vui lòng build FAISS index trước'))
     
     st.markdown("---")
@@ -182,14 +182,14 @@ if uploaded_file is not None:
                                 st.pyplot(fig_result)
                                 plt.close()
                     else:
-                        st.warning(f"⚠️ File không tìm thấy: {file_path}")
+                        st.warning(f"File không tìm thấy: {file_path}")
                     
                     st.markdown("---")
             else:
                 st.info("Không tìm thấy kết quả phù hợp")
                 
         except Exception as e:
-            st.error(f"❌ Lỗi khi tìm kiếm: {str(e)}")
+            st.error(f"Lỗi khi tìm kiếm: {str(e)}")
             st.exception(e)
     
     # Cleanup

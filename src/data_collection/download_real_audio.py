@@ -140,17 +140,68 @@ def download_youtube_samples():
     print("YouTube Audio Download")
     print("="*60)
     
-    # Example female voice channels/videos
+    try:
+        import yt_dlp
+    except ImportError:
+        print("\nError: yt-dlp not installed")
+        print("Install with: pip install yt-dlp")
+        return 0
+    
+    # YouTube URLs to download
     video_urls = [
-        # Example public domain/CC videos (replace with actual URLs)
-        "https://www.youtube.com/watch?v=EXAMPLE1",  # Replace
-        "https://www.youtube.com/watch?v=EXAMPLE2",  # Replace
+        "https://www.youtube.com/watch?v=SSGkkMEeoJE",  # 1
+        "https://www.youtube.com/watch?v=NEZnRlVuKg8",  # 2
+        "https://www.youtube.com/watch?v=qZuxop5xj_E",  # 3
+        "https://www.youtube.com/watch?v=fBnjGCEmzGQ",  # 4
+        "https://www.youtube.com/watch?v=9c-yi4vCqZg",  # 5
+        "https://www.youtube.com/watch?v=pshSh--QiIo",  # 6
     ]
     
-    print("\nYou need to provide YouTube URLs of videos with female voices")
-    print("Examples: Podcasts, audiobooks, speeches, TED Talks")
-    print("\nEdit this script and add URLs, then run:")
-    print("  python src/data_collection/download_real_audio.py youtube")
+    output_dir = Path("data/raw")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    print(f"\nDownloading {len(video_urls)} videos...")
+    print(f"Output directory: {output_dir}\n")
+    
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'wav',
+        }],
+        'outtmpl': str(output_dir / 'yt_%(id)s.%(ext)s'),
+        'quiet': False,
+        'no_warnings': False,
+    }
+    
+    count = 0
+    failed = []
+    
+    for idx, url in enumerate(video_urls, 1):
+        try:
+            print(f"\n[{idx}/{len(video_urls)}] Downloading: {url}")
+            
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                video_id = info.get('id', f'unknown_{idx}')
+                title = info.get('title', 'Unknown')
+                
+                print(f"Downloaded: {title}")
+                count += 1
+                
+        except Exception as e:
+            print(f"Error downloading {url}: {e}")
+            failed.append(url)
+    
+    print("\n" + "="*60)
+    print(f"Download complete: {count}/{len(video_urls)} successful")
+    if failed:
+        print(f"\nFailed URLs ({len(failed)}):")
+        for url in failed:
+            print(f"  - {url}")
+    print("="*60)
+    
+    return count
 
 
 def main():

@@ -39,7 +39,7 @@ def build_database(
     audio_files = sorted(list(audio_dir.glob("*.wav")))
     
     if len(audio_files) == 0:
-        print(f"❌ No audio files found in {processed_audio_dir}")
+        print(f"No audio files found in {processed_audio_dir}")
         print("Please run data collection and preprocessing first:")
         print("  1. python src/data_collection/download_audio.py")
         print("  2. python src/data_collection/preprocess_audio.py")
@@ -53,7 +53,7 @@ def build_database(
     print(f"Feature dimension: {feature_dim}")
     
     # Extract features from all files
-    print("\n📊 Extracting features...")
+    print("\nExtracting features...")
     features_list = []
     mapping = {}
     failed_files = []
@@ -65,7 +65,7 @@ def build_database(
             
             # Validate features
             if np.isnan(features).any() or np.isinf(features).any():
-                print(f"\n⚠️ Invalid features for {audio_file.name}, skipping")
+                print(f"\nInvalid features for {audio_file.name}, skipping")
                 failed_files.append(str(audio_file))
                 continue
             
@@ -73,7 +73,7 @@ def build_database(
             mapping[len(features_list) - 1] = str(audio_file)
             
         except Exception as e:
-            print(f"\n❌ Error processing {audio_file.name}: {e}")
+            print(f"\nError processing {audio_file.name}: {e}")
             failed_files.append(str(audio_file))
     
     # Convert to numpy array
@@ -91,7 +91,7 @@ def build_database(
     print(f"Mapping saved to {mapping_output}")
     
     # Build FAISS index
-    print("\n🔧 Building FAISS index...")
+    print("\nBuilding FAISS index...")
     faiss_manager = FAISSManager(
         dimension=feature_dim,
         index_path=faiss_index_output,
@@ -117,9 +117,9 @@ def build_database(
     print(f"Index type: {stats['index_type']}")
     
     if failed_files:
-        print(f"\n⚠️ Failed to process {len(failed_files)} files")
+        print(f"\nFailed to process {len(failed_files)} files")
     
-    print("\n✅ Database is ready for similarity search!")
+    print("\nDatabase is ready for similarity search!")
     print("\nNext step: Run the Streamlit app")
     print("  streamlit run app/streamlit_app.py")
 

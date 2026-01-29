@@ -4,12 +4,12 @@ Hệ thống tìm kiếm âm thanh giọng nói phụ nữ sử dụng **similar
 
 ## 🎯 Tính năng
 
-- ✅ Thu thập dataset giọng nói phụ nữ (HuggingFace, YouTube)
-- ✅ Trích xuất 52 đặc trưng âm thanh (MFCC, pitch, spectral, temporal, chroma)
-- ✅ Lưu trữ vector embeddings với FAISS
-- ✅ Tìm kiếm similarity với độ chính xác cao
-- ✅ Giao diện web Streamlit đẹp mắt, dễ sử dụng
-- ✅ Hiển thị dạng sóng âm thanh
+- Thu thập dataset giọng nói phụ nữ (HuggingFace, YouTube)
+- Trích xuất 52 đặc trưng âm thanh (MFCC, pitch, spectral, temporal, chroma)
+- Lưu trữ vector embeddings với FAISS
+- Tìm kiếm similarity với độ chính xác cao
+- Giao diện web Streamlit đẹp mắt, dễ sử dụng
+- Hiển thị dạng sóng âm thanh
 
 ## 🛠️ Tech Stack
 
@@ -98,7 +98,7 @@ streamlit run app/streamlit_app.py
 
 Mở trình duyệt tại `http://localhost:8501`
 
-## 📊 Đặc trưng âm thanh (52 dimensions)
+## Đặc trưng âm thanh (52 dimensions)
 
 | Feature      | Số chiều | Mô tả                                        |
 | ------------ | -------- | -------------------------------------------- |
@@ -136,7 +136,7 @@ Mở trình duyệt tại `http://localhost:8501`
 - **`src/data_collection/preprocess_audio.py`** - Audio preprocessing
 - **`scripts/build_database.py`** - Build FAISS database
 
-## 🔧 Tùy chỉnh
+## Tùy chỉnh
 
 ### Thay đổi feature extraction
 

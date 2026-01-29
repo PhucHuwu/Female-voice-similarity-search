@@ -100,7 +100,7 @@ Female-voice-similarity-search/
 
 ---
 
-## 📊 Kiến trúc hệ thống
+## Kiến trúc hệ thống
 
 ```mermaid
 flowchart TD
@@ -144,7 +144,7 @@ flowchart TD
 
 ---
 
-## 🔧 Chi tiết các đặc trưng âm thanh (Features)
+## Chi tiết các đặc trưng âm thanh (Features)
 
 | Feature                | Mô tả                                              | Kích thước          | Thư viện                             |
 | ---------------------- | -------------------------------------------------- | ------------------- | ------------------------------------ |
@@ -482,7 +482,7 @@ if uploaded_file:
 
 ---
 
-## ✅ PHASE X: VERIFICATION (Final Checklist)
+## PHASE X: VERIFICATION (Final Checklist)
 
 > 🔴 **Thực thi các bước này TRƯỚC KHI đánh dấu project hoàn thành**
 
@@ -656,7 +656,7 @@ streamlit run app/streamlit_app.py
 
 ---
 
-## ✅ Plan Status
+## Plan Status
 
 - [x] Requirements analysis complete
 - [x] Tech stack decided

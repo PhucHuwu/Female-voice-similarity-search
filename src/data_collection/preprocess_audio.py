@@ -82,7 +82,7 @@ def preprocess_dataset(
     print(f"Metadata saved to {processed_metadata_path}")
     
     if failed_files:
-        print(f"\n⚠ Failed to process {len(failed_files)} files:")
+        print(f"\nFailed to process {len(failed_files)} files:")
         for f in failed_files[:5]:
             print(f"  - {f}")
 

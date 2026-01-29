@@ -41,7 +41,7 @@ class VoiceSimilaritySearch:
             self.faiss_manager.load_index()
             print("Loaded existing FAISS index")
         except FileNotFoundError:
-            print("⚠ No existing index found. Build index first.")
+            print("No existing index found. Build index first.")
     
     def search_similar(
         self,
