@@ -70,15 +70,13 @@ class VoiceSimilaritySearch:
         # Search in FAISS index
         results = self.faiss_manager.search(query_features, k=top_k)
         
-        # Convert L2 distance to similarity score (0-100%)
+        # Convert cosine similarity (0-1) to percentage (0-100%)
         normalized_results = []
-        for file_path, distance in results:
-            # Use exponential decay for better similarity scoring
-            # Same file: distance ~0-3 → ~95-100%
-            # Similar voice: distance 3-10 → ~70-95%
-            # Different voice: distance >10 → <70%
-            similarity_score = 100 * np.exp(-distance / 10)
-            normalized_results.append((file_path, similarity_score, distance))
+        for file_path, similarity in results:
+            # Cosine similarity is already 0-1, just convert to percentage
+            # 1.0 = 100% (identical), 0.0 = 0% (completely different)
+            similarity_score = similarity * 100
+            normalized_results.append((file_path, similarity_score, similarity))
         
         return normalized_results
     

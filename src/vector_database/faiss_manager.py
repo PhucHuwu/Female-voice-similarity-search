@@ -36,14 +36,14 @@ class FAISSManager:
     
     def create_index(self) -> faiss.Index:
         """
-        Create new FAISS index using L2 distance
+        Create new FAISS index using Inner Product (Cosine Similarity)
         
         Returns:
             FAISS index
         """
-        # Use IndexFlatL2 for exact search
-        self.index = faiss.IndexFlatL2(self.dimension)
-        print(f"Created FAISS index with dimension {self.dimension}")
+        # Use IndexFlatIP for cosine similarity (after L2 normalization)
+        self.index = faiss.IndexFlatIP(self.dimension)
+        print(f"Created FAISS index with dimension {self.dimension} (Cosine Similarity)")
         return self.index
     
     def add_vectors(
@@ -64,6 +64,9 @@ class FAISSManager:
         # Ensure vectors are float32
         vectors = vectors.astype('float32')
         
+        # L2 normalize for cosine similarity
+        faiss.normalize_L2(vectors)
+        
         # Get current index count
         start_idx = self.index.ntotal
         
@@ -74,7 +77,7 @@ class FAISSManager:
         for i, file_path in enumerate(file_paths):
             self.mapping[start_idx + i] = file_path
         
-        print(f"Added {len(file_paths)} vectors. Total: {self.index.ntotal}")
+        print(f"Added {len(file_paths)} vectors (L2 normalized). Total: {self.index.ntotal}")
     
     def search(
         self,
@@ -82,14 +85,15 @@ class FAISSManager:
         k: int = 5
     ) -> List[Tuple[str, float]]:
         """
-        Search for k most similar vectors
+        Search for k most similar vectors using cosine similarity
         
         Args:
             query_vector: Query feature vector
             k: Number of results to return
             
         Returns:
-            List of (file_path, distance) tuples
+            List of (file_path, similarity_score) tuples
+            similarity_score: 0-1, where 1 = identical, 0 = orthogonal
         """
         if self.index is None:
             raise ValueError("Index not loaded. Call load_index() first.")
@@ -99,14 +103,19 @@ class FAISSManager:
             query_vector = query_vector.reshape(1, -1)
         query_vector = query_vector.astype('float32')
         
-        # Search
-        distances, indices = self.index.search(query_vector, k)
+        # L2 normalize query for cosine similarity
+        faiss.normalize_L2(query_vector)
+        
+        # Search (returns inner products = cosine similarities)
+        similarities, indices = self.index.search(query_vector, k)
         
         # Map indices to file paths
         results = []
-        for idx, dist in zip(indices[0], distances[0]):
+        for idx, sim in zip(indices[0], similarities[0]):
             file_path = self.mapping.get(int(idx), "Unknown")
-            results.append((file_path, float(dist)))
+            # Clip to [0, 1] range (sometimes numerical issues cause >1)
+            sim = float(np.clip(sim, 0, 1))
+            results.append((file_path, sim))
         
         return results
     
