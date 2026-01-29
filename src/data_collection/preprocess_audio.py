@@ -14,7 +14,7 @@ from src.utils.audio_utils import preprocess_audio, save_audio
 
 
 def preprocess_dataset(
-    input_dir: str = "data/raw",
+    input_dir: str = "data/chunks",
     output_dir: str = "data/processed",
     metadata_path: str = "data/metadata.csv",
     target_sr: int = 16000,
