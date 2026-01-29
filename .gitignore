@@ -60,4 +60,6 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
 .agent/
+*.csv

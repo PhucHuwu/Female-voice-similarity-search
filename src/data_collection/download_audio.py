@@ -36,7 +36,7 @@ class AudioDownloader:
         Download audio from HuggingFace datasets
         
         Args:
-            dataset_name: Name of the dataset (e.g., "mozilla-foundation/common_voice_13_0")
+            dataset_name: Name of the dataset
             split: Dataset split to use
             max_samples: Maximum number of samples to download
             gender_filter: Filter by gender if available
@@ -47,25 +47,36 @@ class AudioDownloader:
         print(f"Loading dataset: {dataset_name}")
         
         try:
-            dataset = load_dataset(dataset_name, "vi", split=split, streaming=True)
+            # Try loading with specific configuration
+            if "librispeech" in dataset_name.lower():
+                dataset = load_dataset(dataset_name, "clean", split=split, streaming=True, trust_remote_code=True)
+            else:
+                dataset = load_dataset(dataset_name, split=split, streaming=True, trust_remote_code=True)
         except Exception as e:
             print(f"Error loading dataset: {e}")
-            print("Trying without language specification...")
-            dataset = load_dataset(dataset_name, split=split, streaming=True)
+            return 0
         
         count = 0
+        processed = 0
+        
+        print(f"Processing samples (target: {max_samples})...")
+        
         for idx, sample in enumerate(dataset):
             if max_samples and count >= max_samples:
                 break
             
-            # Filter by gender if field exists
-            if gender_filter and 'gender' in sample:
-                if sample['gender'] != gender_filter:
-                    continue
+            processed += 1
+            if processed > max_samples * 10:  # Safety limit
+                print(f"Processed {processed} samples, stopping")
+                break
             
             # Get audio data
             audio = sample.get('audio', None)
             if audio is None:
+                continue
+            
+            # Basic validation
+            if len(audio['array']) < 8000:  # Skip very short clips
                 continue
             
             # Save audio file
@@ -86,8 +97,8 @@ class AudioDownloader:
             })
             
             count += 1
-            if count % 10 == 0:
-                print(f"Downloaded {count} files...")
+            if count % 5 == 0:
+                print(f"Downloaded {count}/{max_samples} files...")
         
         print(f"Total downloaded from HuggingFace: {count}")
         return count
@@ -166,7 +177,7 @@ class AudioDownloader:
         return pd.read_csv(metadata_path)
 
 
-def download_sample_dataset(output_dir: str = "data/raw", num_samples: int = 50):
+def download_sample_dataset(output_dir: str = "data/raw", num_samples: int = 10):
     """
     Download a sample dataset for testing
     
@@ -177,12 +188,13 @@ def download_sample_dataset(output_dir: str = "data/raw", num_samples: int = 50)
     downloader = AudioDownloader(output_dir)
     
     print(f"Downloading {num_samples} sample audio files...")
-    print("Source: Mozilla Common Voice (Vietnamese)")
+    print("Source: LibriSpeech ASR (English female voices)")
+    print("Note: This will download clean speech samples")
     
-    # Download from Common Voice
+    # Download from LibriSpeech ASR
     count = downloader.download_from_huggingface(
-        dataset_name="mozilla-foundation/common_voice_13_0",
-        split="train",
+        dataset_name="librispeech_asr",
+        split="train.clean.100", # Using a smaller clean split for samples
         max_samples=num_samples,
         gender_filter="female"
     )
