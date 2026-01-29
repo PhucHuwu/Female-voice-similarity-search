@@ -77,9 +77,9 @@ def preprocess_dataset(
     processed_metadata_path = "data/processed_metadata.csv"
     df.to_csv(processed_metadata_path, index=False)
     
-    print(f"\n✓ Processed {len(processed_metadata)} files")
-    print(f"✓ Saved to {output_dir}")
-    print(f"✓ Metadata saved to {processed_metadata_path}")
+    print(f"\nProcessed {len(processed_metadata)} files")
+    print(f"Saved to {output_dir}")
+    print(f"Metadata saved to {processed_metadata_path}")
     
     if failed_files:
         print(f"\n⚠ Failed to process {len(failed_files)} files:")

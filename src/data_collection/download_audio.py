@@ -190,10 +190,10 @@ def download_sample_dataset(output_dir: str = "data/raw", num_samples: int = 50)
     # Save metadata
     downloader.save_metadata()
     
-    print(f"\n✓ Downloaded {count} files to {output_dir}")
-    print("✓ Metadata saved to data/metadata.csv")
+    print(f"\nDownloaded {count} files to {output_dir}")
+    print("Metadata saved to data/metadata.csv")
 
 
 if __name__ == "__main__":
     # Example usage
-    download_sample_dataset(num_samples=50)
+    download_sample_dataset(num_samples=10)

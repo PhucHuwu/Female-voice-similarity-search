@@ -45,12 +45,12 @@ def build_database(
         print("  2. python src/data_collection/preprocess_audio.py")
         return
     
-    print(f"\n✓ Found {len(audio_files)} audio files")
+    print(f"\nFound {len(audio_files)} audio files")
     
     # Initialize feature extractor
     extractor = AudioFeatureExtractor()
     feature_dim = extractor.get_feature_dimension()
-    print(f"✓ Feature dimension: {feature_dim}")
+    print(f"Feature dimension: {feature_dim}")
     
     # Extract features from all files
     print("\n📊 Extracting features...")
@@ -78,17 +78,17 @@ def build_database(
     
     # Convert to numpy array
     features_array = np.array(features_list)
-    print(f"\n✓ Extracted features: {features_array.shape}")
+    print(f"\nExtracted features: {features_array.shape}")
     
     # Save features
     Path(features_output).parent.mkdir(parents=True, exist_ok=True)
     np.save(features_output, features_array)
-    print(f"✓ Features saved to {features_output}")
+    print(f"Features saved to {features_output}")
     
     # Save mapping
     with open(mapping_output, 'w', encoding='utf-8') as f:
         json.dump(mapping, f, indent=2, ensure_ascii=False)
-    print(f"✓ Mapping saved to {mapping_output}")
+    print(f"Mapping saved to {mapping_output}")
     
     # Build FAISS index
     print("\n🔧 Building FAISS index...")
