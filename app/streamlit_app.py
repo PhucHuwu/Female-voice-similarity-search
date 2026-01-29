@@ -1,5 +1,6 @@
 """
-Streamlit web app for voice similarity search
+Advanced Streamlit web app for voice similarity search
+với visualizations và feature analysis
 """
 import streamlit as st
 import sys
@@ -10,213 +11,457 @@ import librosa
 import librosa.display
 import matplotlib.pyplot as plt
 import numpy as np
+import plotly.graph_objects as go
+import plotly.express as px
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+import pandas as pd
+
 from src.search.similarity_search import VoiceSimilaritySearch
+from src.feature_extraction.extractor import AudioFeatureExtractor
 from src.utils.audio_utils import save_audio
 import os
 
 # Page config
 st.set_page_config(
-    page_title="Voice Similarity Search",
+    page_title="Voice Similarity Search - Advanced",
     page_icon="🎤",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 # Custom CSS
 st.markdown("""
 <style>
     .main-header {
-        font-size: 2.5rem;
+        font-size: 2.8rem;
         font-weight: bold;
-        color: #1f77b4;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
         text-align: center;
         margin-bottom: 1rem;
     }
     .result-card {
-        background-color: #f0f2f6;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
         padding: 1.5rem;
-        border-radius: 10px;
+        border-radius: 15px;
         margin: 1rem 0;
-        border-left: 5px solid #1f77b4;
+        border-left: 5px solid #667eea;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
     .similarity-score {
-        font-size: 1.5rem;
+        font-size: 2rem;
         font-weight: bold;
-        color: #2ca02c;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    .feature-section {
+        background-color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 10px;
+        margin: 0.5rem 0;
+    }
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        background-color: #f0f2f6;
+        border-radius: 10px;
+        padding: 10px 20px;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Initialize session state
-if 'search_system' not in st.session_state:
+# Feature names
+FEATURE_NAMES = [
+    *[f"MFCC_{i}_mean" for i in range(1, 14)],
+    *[f"MFCC_{i}_std" for i in range(1, 14)],
+    "Pitch_mean", "Pitch_std", "Pitch_min", "Pitch_max",
+    "Centroid_mean", "Centroid_std",
+    "Rolloff_mean", "Rolloff_std",
+    "Bandwidth_mean", "Bandwidth_std",
+    "ZCR_mean", "ZCR_std",
+    "RMS_mean", "RMS_std",
+    *[f"Chroma_{i}" for i in range(12)]
+]
+
+FEATURE_GROUPS = {
+    "MFCC (Timbre)": list(range(0, 26)),
+    "Pitch": list(range(26, 30)),
+    "Spectral": list(range(30, 36)),
+    "Temporal": list(range(36, 40)),
+    "Chroma": list(range(40, 52))
+}
+
+# Initialize
+@st.cache_resource
+def load_search_system():
     try:
-        st.session_state.search_system = VoiceSimilaritySearch()
-        st.session_state.system_ready = True
+        return VoiceSimilaritySearch(), AudioFeatureExtractor(), True, None
     except Exception as e:
-        st.session_state.system_ready = False
-        st.session_state.error_message = str(e)
+        return None, None, False, str(e)
+
+search_system, feature_extractor, system_ready, error_msg = load_search_system()
 
 # Header
-st.markdown('<div class="main-header">🎤 Hệ thống Tìm kiếm Giọng nói Phụ nữ</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">🎤 Voice Similarity Search - Advanced Analytics</div>', unsafe_allow_html=True)
+st.markdown("Phân tích chi tiết 52 đặc trưng âm thanh và trực quan hóa không gian vector")
 st.markdown("---")
 
-# Sidebar - System Info
+# Sidebar
 with st.sidebar:
-    st.header("Thông tin Hệ thống")
+    st.header("⚙️ Cài đặt")
     
-    if st.session_state.system_ready:
-        stats = st.session_state.search_system.get_system_stats()
-        st.metric("Số lượng giọng nói", stats.get('total_vectors', 0))
-        st.metric("Số chiều đặc trưng", stats.get('feature_dimension', 0))
-        st.info(f"**Database:** {stats.get('index_type', 'N/A')}")
+    if system_ready:
+        stats = search_system.get_system_stats()
+        st.success("✅ Hệ thống sẵn sàng")
+        st.metric("Số giọng nói", stats.get('total_vectors', 0))
+        st.metric("Chiều đặc trưng", stats.get('feature_dimension', 0))
+        st.info(f"**Index:** {stats.get('index_type', 'N/A')}")
     else:
-        st.error("Hệ thống chưa sẵn sàng")
-        st.write(st.session_state.get('error_message', 'Vui lòng build FAISS index trước'))
+        st.error("❌ Hệ thống chưa sẵn sàng")
+        st.code(error_msg if error_msg else "Build database first")
+    
+    st.markdown("---")
+    
+    top_k = st.slider("📊 Số kết quả", 1, 10, 5)
+    show_waveform = st.checkbox("📈 Dạng sóng", True)
+    show_spectrogram = st.checkbox("🌈 Spectrogram", True)
+    show_features = st.checkbox("🔬 Chi tiết features", True)
+    show_vector_viz = st.checkbox("🎯 Vector visualization", True)
     
     st.markdown("---")
     st.markdown("""
     ### 📝 Hướng dẫn
-    1. Tải lên file âm thanh giọng phụ nữ
-    2. Chờ hệ thống xử lý
-    3. Xem kết quả tìm kiếm top 5 giọng tương đồng
-    
-    **Định dạng:** WAV, MP3, FLAC
-    **Thời lượng:** 3-10 giây (tối ưu)
+    1. Upload audio (WAV/MP3/FLAC)
+    2. Xem 5 tabs phân tích:
+       - 📊 **Results**: Top matches
+       - 🔬 **Features**: 52 features
+       - 📈 **Comparison**: Feature comparison
+       - 🎯 **Vectors**: PCA/t-SNE plot
+       - 💡 **Insights**: Giải thích
     """)
 
-# Main content
-if not st.session_state.system_ready:
-    st.error("🚫 Hệ thống chưa sẵn sàng. Vui lòng build FAISS index trước khi sử dụng.")
-    st.code("""
-    # Chạy các lệnh sau để setup:
-    python src/data_collection/download_audio.py
-    python src/data_collection/preprocess_audio.py
-    python scripts/build_database.py
-    """)
+# Main
+if not system_ready:
+    st.error("🚫 Hệ thống chưa sẵn sàng")
     st.stop()
 
-# File upload
-col1, col2 = st.columns([2, 1])
+uploaded_file = st.file_uploader(
+    "📤 Upload audio file",
+    type=['wav', 'mp3', 'flac'],
+    help="Upload audio để tìm giọng tương đồng"
+)
 
-with col1:
-    st.subheader("📤 Tải lên âm thanh tìm kiếm")
-    uploaded_file = st.file_uploader(
-        "Chọn file âm thanh giọng phụ nữ",
-        type=['wav', 'mp3', 'flac'],
-        help="Tải lên file âm thanh để tìm các giọng nói tương đồng"
-    )
-
-with col2:
-    st.subheader("⚙️ Tùy chọn")
-    top_k = st.slider("Số kết quả", min_value=1, max_value=10, value=5)
-    show_waveform = st.checkbox("Hiển thị dạng sóng", value=True)
-
-# Process uploaded file
-if uploaded_file is not None:
-    st.markdown("---")
-    
-    # Save uploaded file temporarily
+if uploaded_file:
+    # Save temp
     temp_dir = Path("temp")
     temp_dir.mkdir(exist_ok=True)
-    temp_file_path = temp_dir / "query_audio.wav"
+    temp_path = temp_dir / "query.wav"
     
-    with open(temp_file_path, "wb") as f:
+    with open(temp_path, "wb") as f:
         f.write(uploaded_file.read())
     
-    # Display query audio
-    st.subheader("🎵 Âm thanh đầu vào")
-    col_a, col_b = st.columns([1, 1])
+    # Load audio
+    y_query, sr_query = librosa.load(str(temp_path))
     
-    with col_a:
-        st.audio(str(temp_file_path), format='audio/wav')
+    # Extract query features
+    with st.spinner('🔍 Đang phân tích...'):
+        query_features = feature_extractor.extract_from_file(str(temp_path))
+        results = search_system.search_similar(str(temp_path), top_k=top_k)
     
-    with col_b:
-        if show_waveform:
-            # Plot waveform
-            y, sr = librosa.load(str(temp_file_path))
-            fig, ax = plt.subplots(figsize=(8, 3))
-            librosa.display.waveshow(y, sr=sr, ax=ax, color='#1f77b4')
-            ax.set_title("Dạng sóng âm thanh đầu vào")
-            ax.set_xlabel("Thời gian (s)")
-            ax.set_ylabel("Biên độ")
-            st.pyplot(fig)
-            plt.close()
+    # Create tabs
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "📊 Kết quả",
+        "🔬 Features Query",
+        "📈 So sánh Features",
+        "🎯 Vector Space",
+        "💡 Insights"
+    ])
     
-    # Search similar voices
-    st.subheader("🔍 Kết quả tìm kiếm")
-    
-    with st.spinner('Đang phân tích và tìm kiếm giọng nói tương đồng...'):
-        try:
-            results = st.session_state.search_system.search_similar(
-                str(temp_file_path),
-                top_k=top_k
-            )
-            
-            # Display results
-            if results:
-                for rank, (file_path, similarity, distance) in enumerate(results, 1):
-                    st.markdown(f"""
-                    <div class="result-card">
-                        <h3>#{rank} - Kết quả</h3>
-                        <p class="similarity-score">Độ tương đồng: {similarity:.1f}%</p>
-                        <p><strong>File:</strong> {Path(file_path).name}</p>
-                        <p><strong>Khoảng cách L2:</strong> {distance:.4f}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # Audio player
-                    if os.path.exists(file_path):
-                        col_c, col_d = st.columns([1, 1])
-                        
-                        with col_c:
-                            st.audio(file_path, format='audio/wav')
-                        
-                        with col_d:
-                            if show_waveform:
-                                # Plot waveform
-                                y_result, sr_result = librosa.load(file_path)
-                                fig_result, ax_result = plt.subplots(figsize=(8, 3))
-                                librosa.display.waveshow(y_result, sr=sr_result, ax=ax_result, color='#2ca02c')
-                                ax_result.set_title(f"Dạng sóng #{rank}")
-                                ax_result.set_xlabel("Thời gian (s)")
-                                ax_result.set_ylabel("Biên độ")
-                                st.pyplot(fig_result)
-                                plt.close()
-                    else:
-                        st.warning(f"File không tìm thấy: {file_path}")
-                    
-                    st.markdown("---")
-            else:
-                st.info("Không tìm thấy kết quả phù hợp")
+    # TAB 1: Results
+    with tab1:
+        st.subheader("🎵 Query Audio")
+        col_q1, col_q2 = st.columns([1, 2])
+        
+        with col_q1:
+            st.audio(str(temp_path))
+            st.metric("Duration", f"{len(y_query)/sr_query:.2f}s")
+            st.metric("Sample Rate", f"{sr_query} Hz")
+        
+        with col_q2:
+            if show_waveform:
+                fig_q, ax_q = plt.subplots(figsize=(10, 3))
+                librosa.display.waveshow(y_query, sr=sr_query, ax=ax_q, color='#667eea')
+                ax_q.set_title("Waveform - Query")
+                st.pyplot(fig_q)
+                plt.close()
+        
+        st.markdown("---")
+        st.subheader(f"🔍 Top {top_k} Similar Voices")
+        
+        for rank, (file_path, similarity, cosine) in enumerate(results, 1):
+            with st.expander(f"#{rank} | {Path(file_path).name} | {similarity:.1f}%", expanded=(rank==1)):
+                col_r1, col_r2, col_r3 = st.columns([1, 1, 1])
                 
-        except Exception as e:
-            st.error(f"Lỗi khi tìm kiếm: {str(e)}")
-            st.exception(e)
+                with col_r1:
+                    st.metric("Similarity", f"{similarity:.2f}%")
+                    st.metric("Cosine", f"{cosine:.4f}")
+                
+                with col_r2:
+                    if os.path.exists(file_path):
+                        st.audio(file_path)
+                
+                with col_r3:
+                    if os.path.exists(file_path) and show_waveform:
+                        y_r, sr_r = librosa.load(file_path)
+                        fig_r, ax_r = plt.subplots(figsize=(6, 2))
+                        librosa.display.waveshow(y_r, sr=sr_r, ax=ax_r, color='#764ba2')
+                        ax_r.set_title(f"Waveform #{rank}")
+                        st.pyplot(fig_r)
+                        plt.close()
+    
+    # TAB 2: Query Features
+    with tab2:
+        st.subheader("🔬 52 Features của Query Audio")
+        
+        # Feature table
+        df_features = pd.DataFrame({
+            'Feature': FEATURE_NAMES,
+            'Value': query_features
+        })
+        
+        # Group by category
+        for group_name, indices in FEATURE_GROUPS.items():
+            with st.expander(f"📌 {group_name} ({len(indices)} features)", expanded=True):
+                group_df = df_features.iloc[indices]
+                
+                # Bar chart
+                fig_bar = px.bar(
+                    group_df,
+                    x='Feature',
+                    y='Value',
+                    title=f"{group_name} Values",
+                    color='Value',
+                    color_continuous_scale='Viridis'
+                )
+                fig_bar.update_layout(height=300)
+                st.plotly_chart(fig_bar, use_container_width=True)
+                
+                # Table
+                st.dataframe(group_df, use_container_width=True)
+    
+    # TAB 3: Feature Comparison
+    with tab3:
+        st.subheader("📈 So sánh Features: Query vs Top Results")
+        
+        if results:
+            # Load top result features
+            top_file = results[0][0]
+            if os.path.exists(top_file):
+                top_features = feature_extractor.extract_from_file(top_file)
+                
+                # Comparison by group
+                for group_name, indices in FEATURE_GROUPS.items():
+                    with st.expander(f"📊 {group_name}", expanded=(group_name=="Pitch")):
+                        query_group = query_features[indices]
+                        top_group = top_features[indices]
+                        
+                        df_compare = pd.DataFrame({
+                            'Feature': [FEATURE_NAMES[i] for i in indices],
+                            'Query': query_group,
+                            'Top Match': top_group,
+                            'Difference': np.abs(query_group - top_group)
+                        })
+                        
+                        # Line chart comparison
+                        fig_compare = go.Figure()
+                        fig_compare.add_trace(go.Scatter(
+                            x=df_compare['Feature'],
+                            y=df_compare['Query'],
+                            mode='lines+markers',
+                            name='Query',
+                            line=dict(color='#667eea', width=2)
+                        ))
+                        fig_compare.add_trace(go.Scatter(
+                            x=df_compare['Feature'],
+                            y=df_compare['Top Match'],
+                            mode='lines+markers',
+                            name='Top Match',
+                            line=dict(color='#764ba2', width=2)
+                        ))
+                        fig_compare.update_layout(
+                            title=f"{group_name} Comparison",
+                            xaxis_title="Feature",
+                            yaxis_title="Value",
+                            height=400
+                        )
+                        st.plotly_chart(fig_compare, use_container_width=True)
+                        
+                        # Difference heatmap
+                        col_c1, col_c2 = st.columns([2, 1])
+                        with col_c1:
+                            st.dataframe(df_compare, use_container_width=True)
+                        with col_c2:
+                            st.metric("Mean Difference", f"{df_compare['Difference'].mean():.4f}")
+                            st.metric("Max Difference", f"{df_compare['Difference'].max():.4f}")
+    
+    # TAB 4: Vector Visualization
+    with tab4:
+        st.subheader("🎯 Vector Space Visualization")
+        
+        if show_vector_viz:
+            # Load database features
+            db_features = np.load('database/features.npy')
+            
+            with st.spinner('Computing PCA...'):
+                # PCA
+                pca = PCA(n_components=2)
+                db_pca = pca.fit_transform(db_features)
+                query_pca = pca.transform(query_features.reshape(1, -1))
+                
+                # Get top results PCA
+                top_indices = []
+                for file_path, _, _ in results[:5]:
+                    # Find index in database
+                    mapping = search_system.faiss_manager.mapping
+                    for idx, path in mapping.items():
+                        if path == file_path:
+                            top_indices.append(idx)
+                            break
+                
+                # Plot PCA
+                fig_pca = go.Figure()
+                
+                # Database points
+                fig_pca.add_trace(go.Scatter(
+                    x=db_pca[:, 0],
+                    y=db_pca[:, 1],
+                    mode='markers',
+                    name='Database',
+                    marker=dict(size=5, color='lightgray', opacity=0.5)
+                ))
+                
+                # Top results
+                if top_indices:
+                    top_pca = db_pca[top_indices]
+                    fig_pca.add_trace(go.Scatter(
+                        x=top_pca[:, 0],
+                        y=top_pca[:, 1],
+                        mode='markers',
+                        name='Top Matches',
+                        marker=dict(size=12, color='orange', symbol='star')
+                    ))
+                
+                # Query point
+                fig_pca.add_trace(go.Scatter(
+                    x=query_pca[:, 0],
+                    y=query_pca[:, 1],
+                    mode='markers',
+                    name='Query',
+                    marker=dict(size=15, color='red', symbol='diamond')
+                ))
+                
+                fig_pca.update_layout(
+                    title=f"PCA Projection (Explained variance: {pca.explained_variance_ratio_.sum()*100:.1f}%)",
+                    xaxis_title=f"PC1 ({pca.explained_variance_ratio_[0]*100:.1f}%)",
+                    yaxis_title=f"PC2 ({pca.explained_variance_ratio_[1]*100:.1f}%)",
+                    height=600
+                )
+                st.plotly_chart(fig_pca, use_container_width=True)
+                
+                st.info("🔴 **Query** | ⭐ **Top Matches** | ⚪ **Database**")
+    
+    # TAB 5: Insights
+    with tab5:
+        st.subheader("💡 Phân tích & Giải thích")
+        
+        if results:
+            top_file, top_sim, top_cosine = results[0]
+            
+            st.markdown(f"""
+            ### 🎯 Kết quả tốt nhất
+            
+            **File:** `{Path(top_file).name}`  
+            **Similarity:** {top_sim:.2f}% (Cosine: {top_cosine:.4f})
+            
+            ### 📊 Phân tích độ tương đồng:
+            
+            {'🟢 **Rất cao** (>95%)' if top_sim > 95 else '🟡 **Cao** (85-95%)' if top_sim > 85 else '🟠 **Trung bình** (70-85%)' if top_sim > 70 else '🔴 **Thấp** (<70%)'}
+            
+            """)
+            
+            # Feature contribution
+            if os.path.exists(top_file):
+                top_features = feature_extractor.extract_from_file(top_file)
+                
+                # Calculate feature differences
+                diffs = np.abs(query_features - top_features)
+                contribution = 1 - (diffs / (np.abs(query_features) + np.abs(top_features) + 1e-8))
+                
+                # Top contributing features
+                top_contrib_idx = np.argsort(contribution)[::-1][:10]
+                
+                st.markdown("### 🔝 Top 10 Features đóng góp vào similarity:")
+                
+                contrib_df = pd.DataFrame({
+                    'Feature': [FEATURE_NAMES[i] for i in top_contrib_idx],
+                    'Contribution': contribution[top_contrib_idx] * 100,
+                    'Query Value': query_features[top_contrib_idx],
+                    'Match Value': top_features[top_contrib_idx]
+                })
+                
+                fig_contrib = px.bar(
+                    contrib_df,
+                    x='Feature',
+                    y='Contribution',
+                    title="Feature Contribution to Similarity",
+                    color='Contribution',
+                    color_continuous_scale='RdYlGn'
+                )
+                st.plotly_chart(fig_contrib, use_container_width=True)
+                
+                st.dataframe(contrib_df, use_container_width=True)
+                
+                st.markdown("""
+                ### 📖 Giải thích:
+                
+                **Cosine Similarity** đo góc giữa 2 vectors trong không gian 52 chiều:
+                - **1.0 (100%)**: Vectors giống hệt nhau
+                - **0.95-1.0 (95-100%)**: Rất tương đồng (cùng speaker)
+                - **0.85-0.95 (85-95%)**: Tương đồng cao (giọng giống nhau)
+                - **< 0.85 (< 85%)**: Khác biệt đáng kể
+                
+                **52 Features bao gồm:**
+                - 26 MFCC: Âm sắc giọng nói
+                - 4 Pitch: Cao độ (F0)
+                - 6 Spectral: Brightness, tone
+                - 4 Temporal: Energy, rhythm
+                - 12 Chroma: Harmonics
+                """)
     
     # Cleanup
-    if temp_file_path.exists():
-        temp_file_path.unlink()
+    if temp_path.exists():
+        temp_path.unlink()
 
 else:
-    # Show sample info when no file uploaded
-    st.info("👆 Vui lòng tải lên file âm thanh để bắt đầu tìm kiếm")
+    st.info("👆 Upload audio file để bắt đầu phân tích")
     
-    # Sample stats
-    if st.session_state.system_ready:
-        st.markdown("### 📈 Thống kê Database")
-        stats = st.session_state.search_system.get_system_stats()
-        
-        col_stats1, col_stats2, col_stats3 = st.columns(3)
-        with col_stats1:
-            st.metric("Tổng số giọng", stats.get('total_vectors', 0))
-        with col_stats2:
-            st.metric("Chiều đặc trưng", stats.get('feature_dimension', 0))
-        with col_stats3:
-            st.metric("Loại index", stats.get('index_type', 'N/A'))
+    if system_ready:
+        st.markdown("### 📈 Database Statistics")
+        stats = search_system.get_system_stats()
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Total Voices", stats['total_vectors'])
+        col2.metric("Features", stats['feature_dimension'])
+        col3.metric("Index Type", stats['index_type'])
 
 # Footer
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #888;">
-    <p>Hệ thống Tìm kiếm Giọng nói dựa trên Độ tương đồng | Powered by FAISS & Librosa</p>
+    <p>Advanced Voice Similarity Search | FAISS + Cosine Similarity | 52D Feature Space</p>
 </div>
 """, unsafe_allow_html=True)
