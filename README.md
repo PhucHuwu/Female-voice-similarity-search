@@ -58,14 +58,17 @@ conda activate voice-search
 
 Build the FAISS database from audio files by running these Python scripts in order:
 
-```bash
+```python
 # Step 1: Download and chunk audio files
 python src/data_collection/download_audio.py
 
-# Step 2: Preprocess audio (normalize, trim, resample to 16kHz)
+# Step 2: Split audio chunks
+python src/data_collection/split_audio_chunks.py
+
+# Step 3: Preprocess audio (normalize, trim, resample to 16kHz)
 python src/data_collection/preprocess_audio.py
 
-# Step 3: Extract features and build FAISS index
+# Step 4: Extract features and build FAISS index
 python scripts/build_database.py
 ```
 
