@@ -19,7 +19,7 @@ import pandas as pd
 
 from src.search.similarity_search import VoiceSimilaritySearch
 from src.feature_extraction.extractor import AudioFeatureExtractor
-from src.utils.audio_utils import save_audio
+from src.utils.audio_utils import save_audio, preprocess_audio
 from src.evaluation.retrieval_evaluator import run_retrieval_evaluation
 import os
 
@@ -218,7 +218,8 @@ if query_audio_path:
     
     # Extract query features
     with st.spinner('🔍 Đang phân tích...'):
-        query_features = feature_extractor.extract_from_file(query_audio_path)
+        query_audio_processed = preprocess_audio(query_audio_path)
+        query_features = feature_extractor.extract_all_features(query_audio_processed)
         results = search_system.search_similar(query_audio_path, top_k=top_k)
     
     # Create tabs
