@@ -4,7 +4,7 @@ Configuration for feature extraction
 
 # Audio preprocessing parameters
 SAMPLE_RATE = 16000  # 16 kHz
-TARGET_DURATION = 3.0  # 3 seconds
+TARGET_DURATION = 5.0  # 5 seconds
 TRIM_SILENCE = True
 SILENCE_THRESHOLD_DB = 20
 

@@ -18,7 +18,7 @@ def preprocess_dataset(
     output_dir: str = "data/processed",
     metadata_path: str = "data/metadata.csv",
     target_sr: int = 16000,
-    target_duration: float = 3.0
+    target_duration: float = 5.0
 ) -> None:
     """
     Preprocess all audio files in dataset

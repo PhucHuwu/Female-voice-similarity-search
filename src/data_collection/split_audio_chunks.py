@@ -13,10 +13,11 @@ import pandas as pd
 def split_audio_to_chunks(
     audio_path: str,
     output_dir: str,
-    chunk_duration: float = 3.0,
-    max_chunks: int = 100,
+    chunk_duration: float = 5.0,
+    max_chunks: int = 20,
     overlap: float = 0.0,
-    sr: int = 16000
+    sr: int = 16000,
+    trim_start_end_sec: float = 30.0,
 ) -> list:
     """
     Split audio file into fixed-duration chunks
@@ -35,6 +36,11 @@ def split_audio_to_chunks(
     # Load audio
     audio, original_sr = librosa.load(audio_path, sr=sr)
     
+    # Trim first/last part to reduce intro/outro noise
+    trim_samples = int(trim_start_end_sec * sr)
+    if len(audio) > 2 * trim_samples:
+        audio = audio[trim_samples:-trim_samples]
+
     # Calculate chunk parameters
     chunk_samples = int(chunk_duration * sr)
     overlap_samples = int(overlap * sr)
@@ -50,10 +56,7 @@ def split_audio_to_chunks(
     output_files = []
     audio_name = Path(audio_path).stem
 
-    # Skip first chunk to avoid intro noise/music
-    start_chunk_idx = 1 if num_chunks > 1 else 0
-
-    for i in range(start_chunk_idx, num_chunks):
+    for i in range(num_chunks):
         start = i * hop_samples
         end = start + chunk_samples
         
@@ -75,9 +78,10 @@ def process_all_youtube_files(
     input_dir: str = "data/raw",
     output_dir: str = "data/chunks",
     query_output_dir: str = "data/query_chunks",
-    chunk_duration: float = 3.0,
-    max_chunks_per_file: int = 100,
+    chunk_duration: float = 5.0,
+    max_chunks_per_file: int = 20,
     query_chunks_per_file: int = 2,
+    trim_start_end_sec: float = 30.0,
 ):
     """
     Process all YouTube audio files and split into chunks
@@ -107,6 +111,7 @@ def process_all_youtube_files(
     print("="*60)
     print(f"Chunk duration: {chunk_duration}s")
     print(f"Max chunks per file: {max_chunks_per_file}")
+    print(f"Trim head/tail: {trim_start_end_sec}s each")
     print(f"Base chunks directory: {output_dir}")
     print(f"Query chunks directory: {query_output_dir}")
     print(f"Query chunks per file: {query_chunks_per_file}\n")
@@ -130,7 +135,8 @@ def process_all_youtube_files(
             chunk_duration=chunk_duration,
             max_chunks=max_chunks_per_file,
             overlap=0.0,
-            sr=16000
+            sr=16000,
+            trim_start_end_sec=trim_start_end_sec,
         )
         
         query_count = min(query_chunks_per_file, max(0, len(chunks) - 1)) if len(chunks) > 1 else 0
@@ -189,7 +195,8 @@ if __name__ == "__main__":
         input_dir="data/raw",
         output_dir="data/chunks",
         query_output_dir="data/query_chunks",
-        chunk_duration=3.0,
-        max_chunks_per_file=100,
+        chunk_duration=5.0,
+        max_chunks_per_file=20,
         query_chunks_per_file=2,
+        trim_start_end_sec=30.0,
     )

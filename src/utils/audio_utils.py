@@ -73,7 +73,7 @@ def fix_length(audio: np.ndarray, target_length: int) -> np.ndarray:
 def preprocess_audio(
     file_path: str,
     target_sr: int = 16000,
-    target_duration: float = 3.0,
+    target_duration: float = 5.0,
     trim: bool = True
 ) -> np.ndarray:
     """

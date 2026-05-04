@@ -26,9 +26,11 @@ wheels/
 # Data directories
 data/raw/*
 data/chunks/*
+data/query_chunks/*
 data/processed/*
 !data/raw/.gitkeep
 !data/chunks/.gitkeep
+!data/query_chunks/.gitkeep
 !data/processed/.gitkeep
 
 # Database
