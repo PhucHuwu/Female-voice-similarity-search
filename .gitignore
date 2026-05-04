@@ -36,9 +36,7 @@ data/query_processed/*
 !data/query_processed/.gitkeep
 
 # Database
-database/vectors/*
-database/*.npy
-database/*.json
+database/*
 !database/.gitkeep
 
 # Temporary files
