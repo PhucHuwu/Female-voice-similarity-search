@@ -1,34 +1,30 @@
-"""
-Build database: Extract features and create FAISS index
-Run this script after collecting and preprocessing audio files
-"""
+"""Build SQLite database with metadata and feature vectors."""
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 import numpy as np
-import pandas as pd
+import librosa
 from tqdm import tqdm
-import json
 
 from src.feature_extraction.extractor import AudioFeatureExtractor
-from src.vector_database.faiss_manager import FAISSManager
+from src.vector_database.metadata_db import MetadataDB, parse_processed_filename, load_video_catalog
 
 
 def build_database(
     processed_audio_dir: str = "data/processed",
     features_output: str = "database/features.npy",
-    mapping_output: str = "database/index_mapping.json",
-    faiss_index_output: str = "database/vectors/faiss_index.bin"
+    metadata_db_path: str = "database/metadata.db",
+    video_catalog_csv: str = "data/list_video.csv",
+    min_required_files: int = 500,
 ):
     """
-    Build complete database: extract features and create FAISS index
+    Build complete database: extract features and save to SQLite
     
     Args:
         processed_audio_dir: Directory with processed audio files
         features_output: Path to save features array
-        mapping_output: Path to save index mapping
-        faiss_index_output: Path to save FAISS index
+        metadata_db_path: Path to SQLite metadata database
     """
     print("="*60)
     print("Building Voice Similarity Search Database")
@@ -44,6 +40,13 @@ def build_database(
         print("  1. python src/data_collection/download_audio.py")
         print("  2. python src/data_collection/preprocess_audio.py")
         return
+
+    if len(audio_files) < min_required_files:
+        print(
+            f"Dataset requirement not met: found {len(audio_files)} files, "
+            f"need at least {min_required_files} files."
+        )
+        return
     
     print(f"\nFound {len(audio_files)} audio files")
     
@@ -55,8 +58,9 @@ def build_database(
     # Extract features from all files
     print("\nExtracting features...")
     features_list = []
-    mapping = {}
     failed_files = []
+    metadata_records = []
+    video_catalog = load_video_catalog(video_catalog_csv)
     
     for idx, audio_file in enumerate(tqdm(audio_files, desc="Processing")):
         try:
@@ -70,7 +74,29 @@ def build_database(
                 continue
             
             features_list.append(features)
-            mapping[len(features_list) - 1] = str(audio_file)
+            vector_idx = len(features_list) - 1
+            file_path = str(audio_file)
+
+            parsed = parse_processed_filename(file_path)
+            sr = librosa.get_samplerate(file_path)
+            duration = librosa.get_duration(path=file_path)
+
+            source_video_id = parsed.get("video_id")
+            source_info = video_catalog.get(source_video_id, {}) if source_video_id else {}
+            voice_name = parsed.get("voice") or source_info.get("voice")
+
+            metadata_records.append({
+                "vector_idx": vector_idx,
+                "file_path": file_path,
+                "source_url": source_info.get("url"),
+                "source_video_id": source_video_id,
+                "voice_name": voice_name,
+                "chunk_id": parsed.get("chunk_id"),
+                "sample_rate": sr,
+                "duration": duration,
+                "feature_dim": feature_dim,
+                "feature_vector": features,
+            })
             
         except Exception as e:
             print(f"\nError processing {audio_file.name}: {e}")
@@ -84,37 +110,20 @@ def build_database(
     Path(features_output).parent.mkdir(parents=True, exist_ok=True)
     np.save(features_output, features_array)
     print(f"Features saved to {features_output}")
-    
-    # Save mapping
-    with open(mapping_output, 'w', encoding='utf-8') as f:
-        json.dump(mapping, f, indent=2, ensure_ascii=False)
-    print(f"Mapping saved to {mapping_output}")
-    
-    # Build FAISS index
-    print("\nBuilding FAISS index...")
-    faiss_manager = FAISSManager(
-        dimension=feature_dim,
-        index_path=faiss_index_output,
-        mapping_path=mapping_output
-    )
-    
-    faiss_manager.create_index()
-    
-    # Get file paths in order
-    file_paths = [mapping[i] for i in range(len(mapping))]
-    faiss_manager.add_vectors(features_array, file_paths)
-    
-    # Save index
-    faiss_manager.save_index()
+
+    # Save metadata DB
+    metadata_db = MetadataDB(metadata_db_path)
+    metadata_db.clear_all()
+    metadata_db.upsert_records(metadata_records)
+    print(f"Metadata DB saved to {metadata_db_path} ({metadata_db.count()} records)")
     
     # Statistics
     print("\n" + "="*60)
     print("Database Build Complete!")
     print("="*60)
-    stats = faiss_manager.get_stats()
-    print(f"Total vectors: {stats['total_vectors']}")
-    print(f"Feature dimension: {stats['dimension']}")
-    print(f"Index type: {stats['index_type']}")
+    print(f"Total vectors: {metadata_db.count()}")
+    print(f"Feature dimension: {feature_dim}")
+    print("Storage type: SQLite (metadata + feature vectors)")
     
     if failed_files:
         print(f"\nFailed to process {len(failed_files)} files")

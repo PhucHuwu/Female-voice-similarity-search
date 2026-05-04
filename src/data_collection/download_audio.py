@@ -3,10 +3,12 @@ Download real female voice samples from public datasets
 Multiple sources available
 """
 import os
+import re
 import requests
 from pathlib import Path
 import json
 import zipfile
+import unicodedata
 from tqdm import tqdm
 
 
@@ -33,6 +35,36 @@ def download_file(url: str, output_path: str) -> bool:
         print(f"Error downloading: {e}")
         return False
 
+
+def sanitize_filename_part(text: str) -> str:
+    """Sanitize text for safe filename usage."""
+    normalized = unicodedata.normalize("NFKD", text)
+    ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
+    cleaned = re.sub(r"[^a-zA-Z0-9]+", "_", ascii_text).strip("_").lower()
+    return cleaned or "unknown"
+
+
+def load_video_entries(csv_path: Path) -> list[tuple[str, str]]:
+    """Load (url, voice) entries from CSV."""
+    if not csv_path.exists():
+        raise FileNotFoundError(f"CSV file not found: {csv_path}")
+
+    video_entries = []
+    with open(csv_path, "r", encoding="utf-8") as f:
+        for i, raw_line in enumerate(f):
+            line = raw_line.strip()
+            if i == 0 or not line:
+                continue
+
+            if line.startswith("http"):
+                parts = line.split(",", 1)
+                url = parts[0].strip().strip('"')
+                voice = parts[1].strip().strip('"') if len(parts) > 1 else "unknown"
+                if url:
+                    video_entries.append((url, voice or "unknown"))
+
+    return video_entries
+
 def download_youtube_samples():
     """Download from YouTube using yt-dlp with workarounds"""
     print("\n" + "="*60)
@@ -46,20 +78,22 @@ def download_youtube_samples():
         print("Install with: pip install yt-dlp")
         return 0
     
-    # YouTube URLs to download
-    video_urls = [
-        "https://www.youtube.com/watch?v=SSGkkMEeoJE",  # 1
-        "https://www.youtube.com/watch?v=NEZnRlVuKg8",  # 2
-        "https://www.youtube.com/watch?v=qZuxop5xj_E",  # 3
-        "https://www.youtube.com/watch?v=fBnjGCEmzGQ",  # 4
-        "https://www.youtube.com/watch?v=9c-yi4vCqZg",  # 5
-        "https://www.youtube.com/watch?v=pshSh--QiIo",  # 6
-    ]
+    csv_path = Path("data/list_video.csv")
+    try:
+        video_entries = load_video_entries(csv_path)
+    except FileNotFoundError as e:
+        print(f"\nError: {e}")
+        return 0
+
+    if not video_entries:
+        print(f"\nError: No video URLs found in {csv_path}")
+        return 0
     
     output_dir = Path("data/raw")
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    print(f"\nDownloading {len(video_urls)} videos...")
+    print(f"\nLoaded {len(video_entries)} video URLs from {csv_path}")
+    print(f"Downloading {len(video_entries)} videos...")
     print(f"Output directory: {output_dir}\n")
     
     # Enhanced yt-dlp options with YouTube workarounds
@@ -104,11 +138,15 @@ def download_youtube_samples():
     count = 0
     failed = []
     
-    for idx, url in enumerate(video_urls, 1):
+    for idx, (url, voice) in enumerate(video_entries, 1):
         try:
-            print(f"\n[{idx}/{len(video_urls)}] Downloading: {url}")
+            safe_voice = sanitize_filename_part(voice)
+            ydl_opts_current = dict(ydl_opts)
+            ydl_opts_current['outtmpl'] = str(output_dir / f'yt_{safe_voice}_%(id)s.%(ext)s')
+
+            print(f"\n[{idx}/{len(video_entries)}] Downloading: {url}")
             
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            with yt_dlp.YoutubeDL(ydl_opts_current) as ydl:
                 info = ydl.extract_info(url, download=True)
                 
                 if info:
@@ -130,7 +168,7 @@ def download_youtube_samples():
             failed.append(url)
     
     print("\n" + "="*60)
-    print(f"Download complete: {count}/{len(video_urls)} successful")
+    print(f"Download complete: {count}/{len(video_entries)} successful")
     if failed:
         print(f"\nFailed URLs ({len(failed)}):")
         for url in failed:

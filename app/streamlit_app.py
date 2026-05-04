@@ -326,12 +326,10 @@ if uploaded_file:
                 # Get top results PCA
                 top_indices = []
                 for file_path, _, _ in results[:5]:
-                    # Find index in database
-                    mapping = search_system.faiss_manager.mapping
-                    for idx, path in mapping.items():
-                        if path == file_path:
-                            top_indices.append(idx)
-                            break
+                    # Find index in feature array by file path
+                    row = search_system.get_metadata(file_path)
+                    if row and row.get('vector_idx') is not None:
+                        top_indices.append(int(row['vector_idx']))
                 
                 # Plot PCA
                 fig_pca = go.Figure()
@@ -462,6 +460,6 @@ else:
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #888;">
-    <p>Advanced Voice Similarity Search | FAISS + Cosine Similarity | 52D Feature Space</p>
+    <p>Advanced Voice Similarity Search | SQLite + Cosine Similarity | 52D Feature Space</p>
 </div>
 """, unsafe_allow_html=True)

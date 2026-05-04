@@ -1,6 +1,6 @@
 # Female Voice Similarity Search
 
-A voice similarity search system that finds similar female voices using audio feature extraction and vector similarity search with FAISS.
+A voice similarity search system that finds similar female voices using audio feature extraction, FAISS vector search, and SQLite metadata search.
 
 ## Overview
 
@@ -10,6 +10,7 @@ This system allows users to upload a female voice audio file and find the top 5 
 
 - Audio feature extraction (52 features including MFCC, Pitch, Spectral, Temporal, and Chroma)
 - FAISS-based vector similarity search
+- SQLite metadata database for audio records
 - Interactive Streamlit web interface
 - Advanced audio analysis and visualization
 - Feature comparison and insights
@@ -68,7 +69,7 @@ python src/data_collection/split_audio_chunks.py
 # Step 3: Preprocess audio (normalize, trim, resample to 16kHz)
 python src/data_collection/preprocess_audio.py
 
-# Step 4: Extract features and build FAISS index
+# Step 4: Extract features, build FAISS index, and save metadata.db
 python scripts/build_database.py
 ```
 
@@ -110,8 +111,8 @@ Female-voice-similarity-search/
     - Spectral features (Centroid, Rolloff, Bandwidth) - 6 features
     - Temporal features (ZCR, RMS Energy) - 4 features
     - Chroma features - 12 features
-3. **Vector Database**: Features are stored in a FAISS index for fast similarity search
-4. **Search**: When a query audio is uploaded, its features are extracted and compared against the database using L2 distance
+3. **Database Layer**: Features are stored in FAISS, metadata is stored in SQLite (`database/metadata.db`)
+4. **Search**: Query audio features are compared against FAISS using cosine similarity; metadata lookups are supported via SQLite
 5. **Results**: The top 5 most similar voices are returned with similarity scores
 
 ## Usage

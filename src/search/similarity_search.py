@@ -6,9 +6,10 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 import numpy as np
-from typing import List, Tuple
+from typing import List, Tuple, Optional, Dict
 from src.feature_extraction.extractor import AudioFeatureExtractor
-from src.vector_database.faiss_manager import FAISSManager
+from src.vector_database.metadata_db import MetadataDB
+from src.search.sqlite_vector_search import SQLiteVectorSearch
 from src.utils.audio_utils import preprocess_audio
 
 
@@ -17,31 +18,19 @@ class VoiceSimilaritySearch:
     
     def __init__(
         self,
-        faiss_index_path: str = "database/vectors/faiss_index.bin",
-        mapping_path: str = "database/index_mapping.json",
+        metadata_db_path: str = "database/metadata.db",
         feature_dim: int = 52
     ):
         """
         Initialize similarity search system
         
         Args:
-            faiss_index_path: Path to FAISS index file
-            mapping_path: Path to index mapping JSON
+            metadata_db_path: Path to SQLite metadata DB
             feature_dim: Feature vector dimension
         """
         self.feature_extractor = AudioFeatureExtractor()
-        self.faiss_manager = FAISSManager(
-            dimension=feature_dim,
-            index_path=faiss_index_path,
-            mapping_path=mapping_path
-        )
-        
-        # Load existing index if available
-        try:
-            self.faiss_manager.load_index()
-            print("Loaded existing FAISS index")
-        except FileNotFoundError:
-            print("No existing index found. Build index first.")
+        self.metadata_db = MetadataDB(metadata_db_path)
+        self.sqlite_vector_search = SQLiteVectorSearch(metadata_db_path)
     
     def search_similar(
         self,
@@ -67,24 +56,31 @@ class VoiceSimilaritySearch:
         else:
             query_features = self.feature_extractor.extract_from_file(query_audio_path)
         
-        # Search in FAISS index
-        results = self.faiss_manager.search(query_features, k=top_k)
-        
-        # Convert cosine similarity (0-1) to percentage (0-100%)
-        normalized_results = []
-        for file_path, similarity in results:
-            # Cosine similarity is already 0-1, just convert to percentage
-            # 1.0 = 100% (identical), 0.0 = 0% (completely different)
-            similarity_score = similarity * 100
-            normalized_results.append((file_path, similarity_score, similarity))
-        
-        return normalized_results
+        rows = self.sqlite_vector_search.search(query_features, top_k=top_k)
+        return [
+            (r["file_path"], r["similarity_percent"], r["cosine_similarity"])
+            for r in rows
+        ]
+
+    def get_metadata(self, file_path: str) -> Optional[Dict]:
+        """Get metadata for a file path from SQLite DB."""
+        return self.metadata_db.get_by_file_path(file_path)
+
+    def search_by_metadata(
+        self,
+        voice: Optional[str] = None,
+        video_id: Optional[str] = None,
+        limit: int = 20,
+    ) -> List[Dict]:
+        """Search audio records by metadata fields."""
+        return self.metadata_db.search(voice=voice, video_id=video_id, limit=limit)
     
     def get_system_stats(self) -> dict:
         """Get system statistics"""
-        faiss_stats = self.faiss_manager.get_stats()
+        total = self.metadata_db.count()
         return {
-            **faiss_stats,
+            "total_vectors": total,
+            "index_type": "SQLiteVectorSearch",
             "feature_dimension": self.feature_extractor.get_feature_dimension()
         }
 
@@ -92,8 +88,7 @@ class VoiceSimilaritySearch:
 def search_similar(
     query_audio_path: str,
     top_k: int = 5,
-    faiss_index_path: str = "database/vectors/faiss_index.bin",
-    mapping_path: str = "database/index_mapping.json"
+    metadata_db_path: str = "database/metadata.db"
 ) -> List[Tuple[str, float, float]]:
     """
     Convenience function for similarity search
@@ -101,15 +96,13 @@ def search_similar(
     Args:
         query_audio_path: Path to query audio
         top_k: Number of results
-        faiss_index_path: FAISS index path
-        mapping_path: Mapping file path
+        metadata_db_path: SQLite metadata DB path
         
     Returns:
         List of (file_path, similarity_score, distance) tuples
     """
     search_system = VoiceSimilaritySearch(
-        faiss_index_path=faiss_index_path,
-        mapping_path=mapping_path
+        metadata_db_path=metadata_db_path
     )
     
     return search_system.search_similar(query_audio_path, top_k=top_k)
