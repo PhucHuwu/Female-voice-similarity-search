@@ -1,144 +1,64 @@
 # Female Voice Similarity Search
 
-A voice similarity search system that finds similar female voices using audio feature extraction, FAISS vector search, and SQLite metadata search.
+A voice similarity search system that finds similar female voices using 52-dimensional audio features, with SQLite as the database for metadata and feature vectors.
 
 ## Overview
 
-This system allows users to upload a female voice audio file and find the top 5 most similar voices from a database of 500+ pre-processed audio samples. The similarity is calculated using advanced audio features including MFCC, pitch, spectral characteristics, and more.
+This system allows users to upload a female voice audio file and find the top 5 most similar voices from a database of 500+ pre-processed audio samples. Similarity is computed with cosine similarity on feature vectors stored in SQLite.
 
 ## Features
 
-- Audio feature extraction (52 features including MFCC, Pitch, Spectral, Temporal, and Chroma)
-- FAISS-based vector similarity search
-- SQLite metadata database for audio records
-- Interactive Streamlit web interface
-- Advanced audio analysis and visualization
-- Feature comparison and insights
+- Audio feature extraction (52 features: MFCC, Pitch, Spectral, Temporal, Chroma)
+- SQLite database for metadata and feature vectors (`database/metadata.db`)
+- Metadata search (voice name, video id)
+- Top-5 voice similarity search from uploaded query audio
+- Interactive Streamlit web interface with analysis visualizations
 
 ## Tech Stack
 
-- **Python 3.10+** - Core programming language
-- **Streamlit** - Web interface
-- **librosa** - Audio processing and feature extraction
-- **FAISS** - Vector similarity search
-- **NumPy/Pandas** - Data manipulation
-- **Matplotlib/Plotly** - Visualization
+- Python 3.10+
+- Streamlit
+- librosa
+- NumPy/Pandas
+- SQLite (builtin `sqlite3`)
+- Matplotlib/Plotly
 
 ## Installation
 
-### Option 1: Using Conda (Recommended)
-
 ```bash
-# Create and activate conda environment
-conda env create -f environment.yml
-conda activate voice-search
-```
-
-### Option 2: Using pip
-
-```bash
-# Create virtual environment
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
 pip install -r requirements.txt
 ```
 
 ## Quick Start
 
-### 1. Setup Environment
-
-Activate the conda environment:
-
 ```bash
-conda activate voice-search
-```
-
-### 2. Build Database
-
-Build the FAISS database from audio files by running these Python scripts in order:
-
-```python
-# Step 1: Download and chunk audio files
+# 1) Download raw audio from list_video.csv
 python src/data_collection/download_audio.py
 
-# Step 2: Split audio chunks
+# 2) Split raw files into 3-second chunks
 python src/data_collection/split_audio_chunks.py
 
-# Step 3: Preprocess audio (normalize, trim, resample to 16kHz)
+# 3) Preprocess chunks (16kHz, trim, normalize, fixed length)
 python src/data_collection/preprocess_audio.py
 
-# Step 4: Extract features, build FAISS index, and save metadata.db
+# 4) Build SQLite database and feature artifacts
 python scripts/build_database.py
-```
 
-### 3. Run the Application
-
-```bash
+# 5) Run app
 streamlit run app/streamlit_app.py
 ```
 
-The application will be available at `http://localhost:8501`
+App URL: `http://localhost:8501`
 
-## Project Structure
+## Database Outputs
 
-```
-Female-voice-similarity-search/
-├── app/                    # Streamlit web application
-├── data/                   # Audio dataset
-│   ├── raw/               # Original full-length audio files
-│   ├── chunks/            # Segmented audio chunks
-│   └── processed/         # Preprocessed audio ready for feature extraction
-├── database/              # FAISS index and feature vectors
-├── src/                   # Source code
-│   ├── data_collection/   # Audio download and preprocessing
-│   ├── feature_extraction/# Audio feature extraction
-│   ├── search/            # Similarity search implementation
-│   ├── utils/             # Utility functions
-│   └── vector_database/   # FAISS database management
-├── scripts/               # Build and utility scripts
-├── tests/                 # Unit tests
-└── docs/                  # Documentation
-```
+- `database/metadata.db`: main SQLite database (metadata + feature vectors)
+- `database/features.npy`: extracted feature matrix backup (N x 52)
 
-## How It Works
+## Notes for Assignment Requirements
 
-1. **Audio Preprocessing**: Audio files are normalized, trimmed of silence, and resampled to 16kHz
-2. **Feature Extraction**: 52 audio features are extracted from each file:
-    - MFCC (Mel-Frequency Cepstral Coefficients) - 26 features
-    - Pitch (F0) - 4 features
-    - Spectral features (Centroid, Rolloff, Bandwidth) - 6 features
-    - Temporal features (ZCR, RMS Energy) - 4 features
-    - Chroma features - 12 features
-3. **Database Layer**: Features are stored in FAISS, metadata is stored in SQLite (`database/metadata.db`)
-4. **Search**: Query audio features are compared against FAISS using cosine similarity; metadata lookups are supported via SQLite
-5. **Results**: The top 5 most similar voices are returned with similarity scores
-
-## Usage
-
-1. Launch the Streamlit application
-2. Upload a female voice audio file (WAV, MP3, or FLAC format)
-3. View the top 5 similar voices with:
-    - Audio playback
-    - Waveform visualization
-    - Similarity scores
-    - Feature analysis and comparison
-
-## Testing
-
-Run tests:
-
-```bash
-pytest tests/
-```
-
-## Requirements
-
-- Python 3.10 or higher
-- At least 2GB of RAM
-- Approximately 1GB of disk space for the database
-
-## Dependencies
-
-See `requirements.txt` for the complete list of dependencies.
+- Dataset requirement is enforced in `scripts/build_database.py` with minimum 500 processed files.
+- Audio is standardized to same duration and sample rate before feature extraction.
+- Metadata and vectors are stored in a DBMS (SQLite), and similarity search is performed from DB vectors.

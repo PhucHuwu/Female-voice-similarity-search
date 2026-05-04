@@ -306,20 +306,15 @@ all_features = concat([
 
 ## Tính Similarity
 
-### FAISS L2 Distance
+Hệ thống hiện dùng **cosine similarity** trực tiếp trên vector 52 chiều được lưu trong SQLite.
 
 ```python
-distance = sqrt(Σ(feature1[i] - feature2[i])²)
+cosine = dot(a, b) / (norm(a) * norm(b))
+similarity_score = cosine * 100
 ```
 
-### Normalization
-
-```python
-similarity_score = max(0, 100 - distance * 10)
-```
-
-- Distance nhỏ → Giọng nói giống nhau → Similarity cao
-- Distance lớn → Giọng nói khác nhau → Similarity thấp
+- Cosine gần 1.0 → giọng nói rất giống
+- Cosine thấp → giọng nói khác biệt
 
 ---
 

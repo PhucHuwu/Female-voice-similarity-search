@@ -2,294 +2,79 @@
 
 ## Tổng quan
 
-Hệ thống tìm kiếm giọng nói phụ nữ dựa trên similarity search với vector embeddings, sử dụng FAISS cho tìm kiếm nhanh.
+Hệ thống tìm kiếm giọng nói phụ nữ dựa trên vector đặc trưng 52 chiều và sử dụng SQLite làm hệ quản trị CSDL trung tâm để lưu metadata + feature vectors.
 
 ## Sơ đồ Kiến trúc
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     OFFLINE PHASE                            │
-│  (Xây dựng database - chạy 1 lần)                           │
-└─────────────────────────────────────────────────────────────┘
-                           │
-        ┌──────────────────┼──────────────────┐
-        │                  │                  │
-        ▼                  ▼                  ▼
-┌──────────────┐   ┌──────────────┐   ┌──────────────┐
-│  Data        │   │  Preprocess  │   │  Feature     │
-│  Collection  │──▶│  Audio       │──▶│  Extraction  │
-│              │   │  16kHz, 3s   │   │  52-dim      │
-└──────────────┘   └──────────────┘   └──────────────┘
-                                              │
-                                              ▼
-                                     ┌──────────────┐
-                                     │  Build       │
-                                     │  FAISS Index │
-                                     └──────────────┘
-                                              │
-                                              ▼
-                                     ┌──────────────┐
-                                     │  Save Index  │
-                                     │  + Mapping   │
-                                     └──────────────┘
+OFFLINE (Build Database)
+Raw Audio -> Chunking -> Preprocess -> Feature Extraction (52D)
+         -> Save SQLite (metadata + vectors) -> Ready
 
-┌─────────────────────────────────────────────────────────────┐
-│                     ONLINE PHASE                             │
-│  (Similarity search - real-time)                            │
-└─────────────────────────────────────────────────────────────┘
-
-    ┌──────────────┐
-    │  User Upload │
-    │  Audio File  │
-    └──────┬───────┘
-           │
-           ▼
-    ┌──────────────┐
-    │  Preprocess  │
-    │  Audio       │
-    └──────┬───────┘
-           │
-           ▼
-    ┌──────────────┐
-    │  Extract     │
-    │  Features    │
-    │  (52-dim)    │
-    └──────┬───────┘
-           │
-           ▼
-    ┌──────────────┐
-    │  FAISS       │
-    │  Search      │
-    │  (L2)        │
-    └──────┬───────┘
-           │
-           ▼
-    ┌──────────────┐
-    │  Top-5       │
-    │  Results     │
-    └──────┬───────┘
-           │
-           ▼
-    ┌──────────────┐
-    │  Streamlit   │
-    │  Display     │
-    └──────────────┘
+ONLINE (Search)
+Query Audio -> Preprocess -> Feature Extraction (52D)
+           -> Cosine Search over SQLite vectors -> Top-5
+           -> Streamlit hiển thị kết quả
 ```
 
-## Components
+## Thành phần chính
 
-### 1. Data Collection (`src/data_collection/`)
+1. `src/data_collection/download_audio.py`
+   - Tải audio từ danh sách `data/list_video.csv`
+   - Đặt tên theo mẫu `yt_<voice>_<id>.wav`
 
-**download_audio.py**
+2. `src/data_collection/split_audio_chunks.py`
+   - Chia audio thành chunk 3 giây
+   - Tạo metadata chunk ở `data/chunks_metadata.csv`
 
-- Download từ HuggingFace Datasets (Common Voice, VoxCeleb)
-- Download từ YouTube với yt-dlp
-- Lưu metadata (file path, duration, source)
+3. `src/data_collection/preprocess_audio.py`
+   - Chuẩn hóa audio về 16kHz, trim silence, normalize, fix length 3 giây
+   - Kết quả ở `data/processed/`
 
-**preprocess_audio.py**
+4. `src/feature_extraction/extractor.py`
+   - Trích xuất 52 features (MFCC, Pitch, Spectral, Temporal, Chroma)
 
-- Resample tất cả audio về 16kHz
-- Trim silence (20dB threshold)
-- Normalize volume
-- Fix length về 3 giây (crop hoặc pad)
+5. `scripts/build_database.py`
+   - Build DB từ `data/processed/`
+   - Enforce điều kiện >= 500 files
+   - Lưu:
+     - `database/metadata.db` (SQLite, nguồn dữ liệu chính)
+     - `database/features.npy` (backup matrix)
 
-### 2. Feature Extraction (`src/feature_extraction/`)
+6. `src/vector_database/metadata_db.py`
+   - Lớp quản lý SQLite schema + CRUD + metadata search
 
-**extractor.py** - AudioFeatureExtractor class
+7. `src/search/sqlite_vector_search.py`
+   - Tính cosine similarity trực tiếp trên vectors trong SQLite
 
-Trích xuất 52 đặc trưng:
+8. `src/search/similarity_search.py`
+   - Pipeline end-to-end query audio -> top-5 kết quả
 
-- **MFCC** (26): Mean + Std của 13 coefficients → Voice timbre
-- **Pitch** (4): Mean, Std, Min, Max F0 → Cao độ giọng
-- **Spectral** (6): Centroid, Rolloff, Bandwidth → Brightness, tone
-- **Temporal** (4): ZCR, RMS Energy → Voiced/Unvoiced
-- **Chroma** (12): 12 pitch classes → Harmonic content
+## Lược đồ CSDL SQLite
 
-**features_config.py**
+Table: `audio_metadata`
 
-- Cấu hình tham số (sample rate, FFT size, hop length, pitch range)
+- `vector_idx` (unique)
+- `file_path` (unique)
+- `source_url`
+- `source_video_id`
+- `voice_name`
+- `chunk_id`
+- `sample_rate`
+- `duration`
+- `feature_dim`
+- `feature_vector` (BLOB float32)
+- `created_at`
 
-### 3. Vector Database (`src/vector_database/`)
+## Luồng dữ liệu
 
-**faiss_manager.py** - FAISSManager class
+1. Build phase:
+   - xử lý hàng loạt audio
+   - trích xuất vector 52 chiều
+   - lưu metadata + vector vào SQLite
 
-- Create index: IndexFlatL2 (exact L2 distance search)
-- Add vectors: Thêm batch vectors + mapping
-- Search: Tìm k-nearest neighbors
-- Save/Load: Lưu index và mapping vào disk
-
-Database files:
-
-- `faiss_index.bin` - FAISS index (binary)
-- `index_mapping.json` - {vector_id: audio_file_path}
-- `features.npy` - Feature vectors array (optional backup)
-
-### 4. Similarity Search (`src/search/`)
-
-**similarity_search.py** - VoiceSimilaritySearch class
-
-Pipeline:
-
-1. Load audio file
-2. Preprocess (normalize, trim, fix length)
-3. Extract features (52-dim vector)
-4. Query FAISS index (L2 distance)
-5. Return top-k results with similarity scores
-
-### 5. Streamlit App (`app/`)
-
-**streamlit_app.py**
-
-UI features:
-
-- File uploader (WAV, MP3, FLAC)
-- Audio player cho query và results
-- Waveform visualization với librosa
-- Similarity score display (0-100%)
-- System statistics sidebar
-
-### 6. Utilities (`src/utils/`)
-
-**audio_utils.py**
-
-- load_audio(): Load và resample
-- trim_silence(): Remove silence
-- normalize_audio(): Peak normalization
-- fix_length(): Crop hoặc pad
-- preprocess_audio(): Complete pipeline
-
-## Data Flow
-
-### Offline (Build Database)
-
-```
-Raw Audio Files (500+)
-    │
-    ├─▶ Preprocess
-    │   ├─ Resample to 16kHz
-    │   ├─ Trim silence
-    │   ├─ Normalize
-    │   └─ Fix length to 3s
-    │
-    ├─▶ Feature Extraction
-    │   ├─ MFCC (26 dims)
-    │   ├─ Pitch (4 dims)
-    │   ├─ Spectral (6 dims)
-    │   ├─ Temporal (4 dims)
-    │   └─ Chroma (12 dims)
-    │   = 52-dim vector
-    │
-    └─▶ FAISS Index
-        ├─ Build L2 index
-        ├─ Add all vectors
-        └─ Save index + mapping
-```
-
-### Online (Search)
-
-```
-Query Audio
-    │
-    ├─▶ Preprocess (same as offline)
-    │
-    ├─▶ Feature Extraction (52-dim)
-    │
-    ├─▶ FAISS Search (L2 distance)
-    │   └─ Find k=5 nearest neighbors
-    │
-    └─▶ Results
-        ├─ Map vector IDs to file paths
-        ├─ Calculate similarity scores
-        └─ Display in Streamlit
-```
-
-## Performance
-
-### Time Complexity
-
-- **Feature Extraction**: O(n) với n = audio length (~0.5s cho 3s audio)
-- **FAISS Search**: O(N) với N = database size (IndexFlatL2 exact search)
-- **Total Query Time**: < 1s cho database ~1000 voices
-
-### Space Complexity
-
-- **Feature storage**: 52 dims × 4 bytes × N samples
-    - 1000 samples = ~200KB
-    - 10000 samples = ~2MB
-- **FAISS Index**: Gần bằng feature storage (IndexFlatL2)
-- **Audio files**: Tùy quality (16kHz, 3s ≈ 300KB/file)
-
-## Scaling Options
-
-### Tăng Dataset Size (>10K voices)
-
-1. **FAISS IndexIVFFlat** (approximate search)
-    - Train với clustering
-    - Faster search, slight accuracy trade-off
-
-2. **Pinecone** (cloud vector DB)
-    - Managed service
-    - Auto-scaling
-    - Hybrid search capabilities
-
-### Tăng Feature Dimensions
-
-- Thêm mel-spectrogram features
-- Thêm formant features
-- Sử dụng pre-trained models (Wav2Vec 2.0, ECAPA-TDNN)
-
-## Dependencies
-
-### Core Libraries
-
-- **librosa**: Audio feature extraction
-- **soundfile**: Audio I/O
-- **pydub**: Audio conversion
-- **numpy**: Array operations
-- **faiss-cpu**: Vector similarity search
-
-### Web Interface
-
-- **streamlit**: Web UI
-- **matplotlib**: Waveform plotting
-- **pandas**: Metadata management
-
-### Data Collection
-
-- **datasets**: HuggingFace datasets
-- **yt-dlp**: YouTube download
-
-## Configuration
-
-Tất cả config constants trong `src/feature_extraction/features_config.py`:
-
-```python
-SAMPLE_RATE = 16000
-TARGET_DURATION = 3.0
-N_MFCC = 13
-N_FFT = 2048
-HOP_LENGTH = 512
-PITCH_FMIN = 85  # Female voice range
-PITCH_FMAX = 300
-```
-
-## Error Handling
-
-- **Invalid audio**: Skip và log trong metadata
-- **Feature extraction fail**: NaN/Inf check, skip nếu invalid
-- **FAISS search fail**: Return empty results với error message
-- **Missing index**: Streamlit hiển thị hướng dẫn build database
-
-## Future Improvements
-
-1. **Model-based features**: Thay MFCC bằng Wav2Vec 2.0 embeddings
-2. **Real-time recording**: Streamlit audio recorder widget
-3. **Batch search**: Upload nhiều files cùng lúc
-4. **Evaluation metrics**: Precision@K, Recall@K với ground truth
-5. **Speaker diarization**: Phân biệt nhiều người trong 1 file
-6. **Voice conversion**: Chuyển đổi giọng nói giữa các speakers
-
----
-
-**Version**: 1.0  
-**Last Updated**: 2026-01-29
+2. Search phase:
+   - extract vector cho query
+   - duyệt vectors trong SQLite
+   - tính cosine similarity
+   - trả top-5 giảm dần theo similarity
