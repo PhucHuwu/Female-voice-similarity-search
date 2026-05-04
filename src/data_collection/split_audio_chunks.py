@@ -49,8 +49,11 @@ def split_audio_to_chunks(
     
     output_files = []
     audio_name = Path(audio_path).stem
-    
-    for i in range(num_chunks):
+
+    # Skip first chunk to avoid intro noise/music
+    start_chunk_idx = 1 if num_chunks > 1 else 0
+
+    for i in range(start_chunk_idx, num_chunks):
         start = i * hop_samples
         end = start + chunk_samples
         
