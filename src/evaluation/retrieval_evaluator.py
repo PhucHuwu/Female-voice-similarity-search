@@ -10,6 +10,22 @@ from src.search.similarity_search import VoiceSimilaritySearch
 from src.vector_database.metadata_db import parse_processed_filename
 
 
+def extract_query_voice_from_name(file_path: str) -> str:
+    """Extract voice key from query filename for both short and long queries."""
+    parsed = parse_processed_filename(file_path)
+    voice = parsed.get("voice")
+    if voice:
+        return voice
+
+    stem = Path(file_path).stem
+    marker = "_longq_d"
+    if stem.startswith("yt_") and marker in stem:
+        prefix = stem[3:stem.index(marker)]
+        if len(prefix) > 12 and prefix[-12] == "_":
+            return prefix[:-12]
+    return ""
+
+
 def run_retrieval_evaluation(
     query_dir: str = "data/query_short,data/query_long",
     metadata_db_path: str = "database/metadata.db",
@@ -42,9 +58,8 @@ def run_retrieval_evaluation(
     rank_scores = {r: [] for r in range(1, top_k + 1)}
 
     for qf in query_files:
-        parsed = parse_processed_filename(str(qf))
-        query_voice = parsed.get("voice")
-        results = search_system.search_similar(str(qf), top_k=top_k, preprocess=False)
+        query_voice = extract_query_voice_from_name(str(qf))
+        results = search_system.search_similar(str(qf), top_k=top_k, preprocess=True)
 
         for rank, (file_path, sim_percent, cosine) in enumerate(results, start=1):
             all_scores.append(float(sim_percent))

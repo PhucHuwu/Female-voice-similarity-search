@@ -35,7 +35,7 @@
 ## Requirement Enforcement
 
 - `scripts/build_database.py` sẽ dừng nếu số file processed < 500.
-- Toàn bộ file processed có cùng độ dài mục tiêu (3 giây) và sample rate 16kHz.
+- Toàn bộ file processed có cùng độ dài mục tiêu (5 giây) và sample rate 16kHz.
 - Toàn bộ file processed có cùng độ dài mục tiêu (5 giây) và sample rate 16kHz.
 
 ## Data Flow Diagram

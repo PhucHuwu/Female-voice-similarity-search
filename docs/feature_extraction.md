@@ -240,7 +240,7 @@ Mặc dù giọng nói không phải âm nhạc, chroma vẫn hữu ích vì:
 ## Pipeline Trích xuất
 
 ```python
-# 1. Load audio (16kHz, 3s)
+# 1. Load audio (16kHz, 5s for base samples)
 audio, sr = librosa.load(file_path, sr=16000)
 
 # 2. Extract features
