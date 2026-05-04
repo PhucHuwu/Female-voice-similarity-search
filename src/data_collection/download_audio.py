@@ -65,6 +65,7 @@ def load_video_entries(csv_path: Path) -> list[tuple[str, str]]:
 
     return video_entries
 
+
 def download_youtube_samples():
     """Download from YouTube using yt-dlp with workarounds"""
     print("\n" + "="*60)
@@ -89,12 +90,11 @@ def download_youtube_samples():
         print(f"\nError: No video URLs found in {csv_path}")
         return 0
     
-    output_dir = Path("data/raw")
-    output_dir.mkdir(parents=True, exist_ok=True)
+    base_output_dir = Path("data/raw")
+    base_output_dir.mkdir(parents=True, exist_ok=True)
     
     print(f"\nLoaded {len(video_entries)} video URLs from {csv_path}")
-    print(f"Downloading {len(video_entries)} videos...")
-    print(f"Output directory: {output_dir}\n")
+    print(f"Downloading {len(video_entries)} videos to: {base_output_dir}\n")
     
     # Enhanced yt-dlp options with YouTube workarounds
     ydl_opts = {
@@ -103,7 +103,7 @@ def download_youtube_samples():
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'wav',
         }],
-        'outtmpl': str(output_dir / 'yt_%(id)s.%(ext)s'),
+        'outtmpl': str(base_output_dir / 'yt_%(id)s.%(ext)s'),
         'quiet': False,
         'no_warnings': False,
         
@@ -137,12 +137,13 @@ def download_youtube_samples():
     
     count = 0
     failed = []
-    
-    for idx, (url, voice) in enumerate(video_entries, 1):
+
+    for idx, entry in enumerate(video_entries, 1):
         try:
+            url, voice = entry
             safe_voice = sanitize_filename_part(voice)
             ydl_opts_current = dict(ydl_opts)
-            ydl_opts_current['outtmpl'] = str(output_dir / f'yt_{safe_voice}_%(id)s.%(ext)s')
+            ydl_opts_current['outtmpl'] = str(base_output_dir / f'yt_{safe_voice}_%(id)s.%(ext)s')
 
             print(f"\n[{idx}/{len(video_entries)}] Downloading: {url}")
             

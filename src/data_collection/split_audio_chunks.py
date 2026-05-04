@@ -71,8 +71,10 @@ def split_audio_to_chunks(
 def process_all_youtube_files(
     input_dir: str = "data/raw",
     output_dir: str = "data/chunks",
+    query_output_dir: str = "data/query_chunks",
     chunk_duration: float = 3.0,
-    max_chunks_per_file: int = 100
+    max_chunks_per_file: int = 100,
+    query_chunks_per_file: int = 2,
 ):
     """
     Process all YouTube audio files and split into chunks
@@ -85,7 +87,9 @@ def process_all_youtube_files(
     """
     input_path = Path(input_dir)
     output_path = Path(output_dir)
+    query_output_path = Path(query_output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
+    query_output_path.mkdir(parents=True, exist_ok=True)
     
     # Find all YouTube audio files
     youtube_files = sorted(input_path.glob("yt_*.wav"))
@@ -100,10 +104,13 @@ def process_all_youtube_files(
     print("="*60)
     print(f"Chunk duration: {chunk_duration}s")
     print(f"Max chunks per file: {max_chunks_per_file}")
-    print(f"Output directory: {output_dir}\n")
+    print(f"Base chunks directory: {output_dir}")
+    print(f"Query chunks directory: {query_output_dir}")
+    print(f"Query chunks per file: {query_chunks_per_file}\n")
     
     metadata = []
     total_chunks = 0
+    total_query_chunks = 0
     
     for audio_file in tqdm(youtube_files, desc="Processing files"):
         # Get file info
@@ -123,13 +130,29 @@ def process_all_youtube_files(
             sr=16000
         )
         
-        print(f"  Created: {len(chunks)} chunks")
-        total_chunks += len(chunks)
+        query_count = min(query_chunks_per_file, max(0, len(chunks) - 1)) if len(chunks) > 1 else 0
+        query_set = set(chunks[-query_count:]) if query_count > 0 else set()
+
+        moved_query_chunks = 0
+        for chunk_path in chunks:
+            if chunk_path in query_set:
+                src = Path(chunk_path)
+                dst = query_output_path / src.name
+                src.replace(dst)
+                moved_query_chunks += 1
+
+        base_count = len(chunks) - moved_query_chunks
+        print(f"  Created: {len(chunks)} chunks (base={base_count}, query={moved_query_chunks})")
+        total_chunks += base_count
+        total_query_chunks += moved_query_chunks
         
         # Track metadata
         for chunk_path in chunks:
+            is_query = chunk_path in query_set
+            final_chunk_path = str((query_output_path / Path(chunk_path).name) if is_query else Path(chunk_path))
             metadata.append({
-                'chunk_path': chunk_path,
+                'chunk_path': final_chunk_path,
+                'set_type': 'query' if is_query else 'base',
                 'original_file': str(audio_file),
                 'original_duration': duration,
                 'chunk_duration': chunk_duration,
@@ -145,8 +168,9 @@ def process_all_youtube_files(
     print("SPLITTING COMPLETE")
     print("="*60)
     print(f"Total YouTube files: {len(youtube_files)}")
-    print(f"Total chunks created: {total_chunks}")
-    print(f"Average chunks per file: {total_chunks/len(youtube_files):.1f}")
+    print(f"Total base chunks: {total_chunks}")
+    print(f"Total query chunks: {total_query_chunks}")
+    print(f"Average base chunks per file: {total_chunks/len(youtube_files):.1f}")
     print(f"Metadata saved to: {metadata_path}")
     print("\n" + "="*60)
     print("NEXT STEPS")
@@ -161,6 +185,8 @@ if __name__ == "__main__":
     process_all_youtube_files(
         input_dir="data/raw",
         output_dir="data/chunks",
+        query_output_dir="data/query_chunks",
         chunk_duration=3.0,
-        max_chunks_per_file=100
+        max_chunks_per_file=100,
+        query_chunks_per_file=2,
     )

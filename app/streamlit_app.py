@@ -20,6 +20,7 @@ import pandas as pd
 from src.search.similarity_search import VoiceSimilaritySearch
 from src.feature_extraction.extractor import AudioFeatureExtractor
 from src.utils.audio_utils import save_audio
+from src.evaluation.retrieval_evaluator import run_retrieval_evaluation
 import os
 
 # Page config
@@ -132,6 +133,29 @@ with st.sidebar:
     show_spectrogram = st.checkbox("🌈 Spectrogram", True)
     show_features = st.checkbox("🔬 Chi tiết features", True)
     show_vector_viz = st.checkbox("🎯 Vector visualization", True)
+
+    st.markdown("---")
+    st.subheader("🧪 Retrieval Evaluation")
+    eval_top_k = st.slider("Top-K đánh giá", 1, 10, 5, key="eval_top_k")
+    if st.button("Run evaluation", use_container_width=True):
+        with st.spinner("Đang chạy đánh giá trên data/query_processed..."):
+            try:
+                eval_summary = run_retrieval_evaluation(
+                    query_dir="data/query_processed",
+                    metadata_db_path="database/metadata.db",
+                    top_k=eval_top_k,
+                    output_dir="reports/retrieval",
+                )
+                st.session_state["eval_summary"] = eval_summary
+                st.success("Đánh giá hoàn tất")
+            except Exception as e:
+                st.error(f"Đánh giá thất bại: {e}")
+
+    if "eval_summary" in st.session_state:
+        s = st.session_state["eval_summary"]
+        st.metric("Query files", s.get("num_query_files", 0))
+        st.metric(f"Hit@{s.get('top_k', eval_top_k)}", f"{s.get('hit_rate_at_k', 0.0):.3f}")
+        st.metric("Mean similarity", f"{s.get('mean_similarity_percent', 0.0):.2f}%")
     
     st.markdown("---")
     st.markdown("""
@@ -205,11 +229,16 @@ if uploaded_file:
         
         for rank, (file_path, similarity, cosine) in enumerate(results, 1):
             with st.expander(f"#{rank} | {Path(file_path).name} | {similarity:.1f}%", expanded=(rank==1)):
+                result_meta = search_system.get_metadata(file_path) or {}
                 col_r1, col_r2, col_r3 = st.columns([1, 1, 1])
                 
                 with col_r1:
                     st.metric("Similarity", f"{similarity:.2f}%")
                     st.metric("Cosine", f"{cosine:.4f}")
+                    st.markdown(f"**Voice:** {result_meta.get('voice_name') or 'N/A'}")
+                    st.markdown(f"**Video ID:** {result_meta.get('source_video_id') or 'N/A'}")
+                    if result_meta.get('source_url'):
+                        st.markdown(f"**Source URL:** {result_meta.get('source_url')}")
                 
                 with col_r2:
                     if os.path.exists(file_path):
@@ -455,6 +484,35 @@ else:
         col1.metric("Total Voices", stats['total_vectors'])
         col2.metric("Features", stats['feature_dimension'])
         col3.metric("Index Type", stats['index_type'])
+
+    if "eval_summary" in st.session_state:
+        st.markdown("### 🧪 Retrieval Evaluation Summary")
+        s = st.session_state["eval_summary"]
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Queries", s.get("num_query_files", 0))
+        c2.metric(f"Hit@{s.get('top_k', 5)}", f"{s.get('hit_rate_at_k', 0.0):.3f}")
+        c3.metric("MRR", f"{s.get('mean_mrr', 0.0):.3f}")
+        c4.metric("Mean sim", f"{s.get('mean_similarity_percent', 0.0):.2f}%")
+
+        st.markdown("**Mean similarity by rank**")
+        rank_df = pd.DataFrame(
+            {
+                "rank": list(s.get("mean_similarity_by_rank", {}).keys()),
+                "mean_similarity_percent": list(s.get("mean_similarity_by_rank", {}).values()),
+            }
+        )
+        if not rank_df.empty:
+            st.dataframe(rank_df, use_container_width=True)
+
+        outputs = s.get("outputs", {})
+        if outputs.get("summary_json") and os.path.exists(outputs["summary_json"]):
+            with open(outputs["summary_json"], "r", encoding="utf-8") as f:
+                st.download_button(
+                    "Download summary.json",
+                    data=f.read(),
+                    file_name="retrieval_summary.json",
+                    mime="application/json",
+                )
 
 # Footer
 st.markdown("---")
