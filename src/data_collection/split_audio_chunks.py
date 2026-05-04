@@ -77,10 +77,10 @@ def split_audio_to_chunks(
 def process_all_youtube_files(
     input_dir: str = "data/raw",
     output_dir: str = "data/chunks",
-    query_output_dir: str = "data/query_chunks",
+    query_output_dir: str = "data/query_short",
     chunk_duration: float = 5.0,
     max_chunks_per_file: int = 20,
-    query_chunks_per_file: int = 2,
+    query_chunks_per_file: int = 1,
     trim_start_end_sec: float = 30.0,
 ):
     """
@@ -194,9 +194,9 @@ if __name__ == "__main__":
     process_all_youtube_files(
         input_dir="data/raw",
         output_dir="data/chunks",
-        query_output_dir="data/query_chunks",
+        query_output_dir="data/query_short",
         chunk_duration=5.0,
         max_chunks_per_file=20,
-        query_chunks_per_file=2,
+        query_chunks_per_file=1,
         trim_start_end_sec=30.0,
     )

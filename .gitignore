@@ -24,17 +24,17 @@ wheels/
 *.egg
 
 # Data directories
-data/*
+data/*.csv
 data/raw/*
 data/chunks/*
-data/query_chunks/*
+data/query_short/*
+data/query_long/*
 data/processed/*
-data/query_processed/*
 !data/raw/.gitkeep
 !data/chunks/.gitkeep
-!data/query_chunks/.gitkeep
+!data/query_short/.gitkeep
+!data/query_long/.gitkeep
 !data/processed/.gitkeep
-!data/query_processed/.gitkeep
 !data/list_video.csv
 
 # Reports

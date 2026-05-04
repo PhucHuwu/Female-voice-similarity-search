@@ -89,8 +89,8 @@ def preprocess_dataset(
 
 if __name__ == "__main__":
     preprocess_dataset(
-        input_dir="data/query_chunks",
-        output_dir="data/query_processed",
+        input_dir="data/query_short",
+        output_dir="data/query_short_processed",
     )
 
     preprocess_dataset()

@@ -11,7 +11,7 @@ from src.vector_database.metadata_db import parse_processed_filename
 
 
 def run_retrieval_evaluation(
-    query_dir: str = "data/query_processed",
+    query_dir: str = "data/query_short,data/query_long",
     metadata_db_path: str = "database/metadata.db",
     scaler_path: str = "database/scaler.pkl",
     pca_path: str = "database/pca.pkl",
@@ -19,13 +19,17 @@ def run_retrieval_evaluation(
     output_dir: str = "reports/retrieval",
 ) -> Dict:
     """Run retrieval evaluation and save report files."""
-    query_path = Path(query_dir)
+    query_dirs = [q.strip() for q in query_dir.split(",") if q.strip()]
+    query_files = []
+    for qd in query_dirs:
+        qp = Path(qd)
+        query_files.extend(sorted(qp.glob("*.wav")))
+
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    query_files = sorted(query_path.glob("*.wav"))
     if not query_files:
-        raise FileNotFoundError(f"No query files found in {query_dir}")
+        raise FileNotFoundError(f"No query files found in: {query_dirs}")
 
     search_system = VoiceSimilaritySearch(
         metadata_db_path=metadata_db_path,
@@ -124,6 +128,7 @@ def run_retrieval_evaluation(
     confusion_normalized.to_csv(confusion_normalized_csv)
 
     summary = {
+        "query_dirs": query_dirs,
         "num_query_files": len(query_files),
         "top_k": top_k,
         "mean_similarity_percent": float(np.mean(all_scores)) if all_scores else 0.0,

@@ -1,4 +1,4 @@
-"""Evaluate retrieval performance on query_processed set."""
+"""Evaluate retrieval performance on short+long query sets."""
 import argparse
 from pathlib import Path
 import sys
@@ -58,7 +58,7 @@ def evaluate(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate retrieval on query set")
-    parser.add_argument("--query-dir", type=str, default="data/query_processed")
+    parser.add_argument("--query-dir", type=str, default="data/query_short,data/query_long")
     parser.add_argument("--db", type=str, default="database/metadata.db")
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--output-dir", type=str, default="reports/retrieval")

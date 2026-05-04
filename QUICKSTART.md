@@ -14,6 +14,11 @@ python src/data_collection/download_audio.py
 # 3) Split to chunks
 python src/data_collection/split_audio_chunks.py
 
+# Split outputs:
+# - data/chunks (base 5s)
+# - data/query_short (test 5s)
+# - data/query_long (test long 10-20s)
+
 # 4) Preprocess
 python src/data_collection/preprocess_audio.py
 
@@ -32,3 +37,4 @@ streamlit run app/streamlit_app.py
 - Build step enforces minimum 500 processed files.
 - Main DB is `database/metadata.db`.
 - Similarity search reads vectors from SQLite and returns top-5 matches.
+- UI and evaluation can use both `data/query_short` and `data/query_long`.

@@ -12,8 +12,10 @@ Raw Audio -> Chunking -> Preprocess -> Feature Extraction (52D)
          -> Save SQLite (metadata + vectors) -> Ready
 
 ONLINE (Search)
-Query Audio -> Preprocess -> Feature Extraction (52D)
-           -> Cosine Search over SQLite vectors -> Top-5
+Query Audio (<5s reject; =5s single-segment; >5s multi-segment)
+           -> Preprocess / Segment (5s windows)
+           -> Feature Extraction (52D) + Transform
+           -> Cosine Search over SQLite vectors -> Aggregate -> Top-5
            -> Streamlit hiển thị kết quả
 ```
 
@@ -24,11 +26,12 @@ Query Audio -> Preprocess -> Feature Extraction (52D)
    - Đặt tên theo mẫu `yt_<voice>_<id>.wav`
 
 2. `src/data_collection/split_audio_chunks.py`
-   - Chia audio thành chunk 3 giây
+   - Chia audio thành chunk 5 giây
+   - Tạo query short (`data/query_short`) và query long (`data/query_long`)
    - Tạo metadata chunk ở `data/chunks_metadata.csv`
 
 3. `src/data_collection/preprocess_audio.py`
-   - Chuẩn hóa audio về 16kHz, trim silence, normalize, fix length 3 giây
+   - Chuẩn hóa audio về 16kHz, trim silence, normalize, fix length 5 giây (cho base)
    - Kết quả ở `data/processed/`
 
 4. `src/feature_extraction/extractor.py`
@@ -49,6 +52,7 @@ Query Audio -> Preprocess -> Feature Extraction (52D)
 
 8. `src/search/similarity_search.py`
    - Pipeline end-to-end query audio -> top-5 kết quả
+   - Query dài được xử lý multi-segment và gộp điểm
 
 ## Lược đồ CSDL SQLite
 

@@ -138,10 +138,10 @@ with st.sidebar:
     st.subheader("🧪 Retrieval Evaluation")
     eval_top_k = st.slider("Top-K đánh giá", 1, 10, 5, key="eval_top_k")
     if st.button("Run evaluation", use_container_width=True):
-        with st.spinner("Đang chạy đánh giá trên data/query_processed..."):
+        with st.spinner("Đang chạy đánh giá trên data/query_short + data/query_long..."):
             try:
                 eval_summary = run_retrieval_evaluation(
-                    query_dir="data/query_processed",
+                    query_dir="data/query_short,data/query_long",
                     metadata_db_path="database/metadata.db",
                     top_k=eval_top_k,
                     output_dir="reports/retrieval",
@@ -185,8 +185,10 @@ query_audio_path = None
 temp_path = None
 
 if query_mode == "Chọn từ danh sách test":
-    query_dir = Path("data/query_processed")
-    query_files = sorted(query_dir.glob("*.wav"))
+    query_dirs = [Path("data/query_short"), Path("data/query_long")]
+    query_files = []
+    for qd in query_dirs:
+        query_files.extend(sorted(qd.glob("*.wav")))
     if query_files:
         selected_query = st.selectbox(
             "Danh sách file test",
@@ -196,7 +198,7 @@ if query_mode == "Chọn từ danh sách test":
         if st.button("🔍 Tìm kiếm", type="primary"):
             query_audio_path = str(selected_query)
     else:
-        st.warning("Không tìm thấy file test trong data/query_processed")
+        st.warning("Không tìm thấy file test trong data/query_short hoặc data/query_long")
 else:
     uploaded_file = st.file_uploader(
         "📤 Upload audio file",
@@ -215,11 +217,17 @@ if query_audio_path:
     
     # Load audio
     y_query, sr_query = librosa.load(query_audio_path)
+    query_duration_sec = len(y_query) / sr_query
+
+    if query_duration_sec < 5.0:
+        st.error(f"Audio query quá ngắn ({query_duration_sec:.2f}s). Vui lòng dùng file >= 5 giây.")
+        if temp_path is not None and temp_path.exists():
+            temp_path.unlink()
+        st.stop()
     
     # Extract query features
     with st.spinner('🔍 Đang phân tích...'):
-        query_audio_processed = preprocess_audio(query_audio_path)
-        query_features = feature_extractor.extract_all_features(query_audio_processed)
+        query_features = search_system.extract_query_features_for_display(query_audio_path)
         results = search_system.search_similar(query_audio_path, top_k=top_k)
     
     # Create tabs
