@@ -30,8 +30,3 @@
 
 - Metadata query: `python scripts/search_metadata.py --voice <keyword>`
 - Similarity query: upload qua `app/streamlit_app.py`, trả top-5 giảm dần
-
-## Ghi chú
-
-- Không sử dụng FAISS trong pipeline hiện tại.
-- Hệ thống dùng SQLite làm nguồn dữ liệu chính cho cả metadata và vector.
