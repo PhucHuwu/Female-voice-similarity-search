@@ -1,5 +1,6 @@
 """Retrieval evaluation utilities for query dataset."""
 import json
+import re
 from pathlib import Path
 from typing import Dict
 
@@ -17,12 +18,20 @@ def extract_query_voice_from_name(file_path: str) -> str:
     if voice:
         return voice
 
-    stem = Path(file_path).stem
-    marker = "_longq_d"
-    if stem.startswith("yt_") and marker in stem:
-        prefix = stem[3:stem.index(marker)]
+    name = Path(file_path).name
+
+    # query_short pattern: yt_<voice>_<videoid>_chunkXXXX.wav
+    m_short = re.match(r"^yt_(?P<voice>.+)_[A-Za-z0-9_-]{11}_chunk\d+\.wav$", name)
+    if m_short:
+        return m_short.group("voice")
+
+    # query_long pattern: yt_<voice>_<videoid>_longq_dXXpYYs.wav
+    m_long = re.match(r"^yt_(?P<prefix>.+)_longq_d\d+p\d+s\.wav$", name)
+    if m_long:
+        prefix = m_long.group("prefix")
         if len(prefix) > 12 and prefix[-12] == "_":
             return prefix[:-12]
+
     return ""
 
 
