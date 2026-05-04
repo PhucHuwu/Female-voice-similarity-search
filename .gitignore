@@ -24,6 +24,7 @@ wheels/
 *.egg
 
 # Data directories
+data/*
 data/raw/*
 data/chunks/*
 data/query_chunks/*
@@ -34,6 +35,7 @@ data/query_processed/*
 !data/query_chunks/.gitkeep
 !data/processed/.gitkeep
 !data/query_processed/.gitkeep
+!data/list_video.csv
 
 # Reports
 reports/*
@@ -70,4 +72,3 @@ Thumbs.db
 .env.local
 
 .agent/
-*.csv
