@@ -174,28 +174,52 @@ if not system_ready:
     st.error("🚫 Hệ thống chưa sẵn sàng")
     st.stop()
 
-uploaded_file = st.file_uploader(
-    "📤 Upload audio file",
-    type=['wav', 'mp3', 'flac'],
-    help="Upload audio để tìm giọng tương đồng"
+st.subheader("🔎 Chọn nguồn query")
+query_mode = st.radio(
+    "Nguồn audio query",
+    ["Chọn từ danh sách test", "Upload từ máy"],
+    horizontal=True,
 )
 
-if uploaded_file:
-    # Save temp
-    temp_dir = Path("temp")
-    temp_dir.mkdir(exist_ok=True)
-    temp_path = temp_dir / "query.wav"
-    
-    with open(temp_path, "wb") as f:
-        f.write(uploaded_file.read())
+query_audio_path = None
+temp_path = None
+
+if query_mode == "Chọn từ danh sách test":
+    query_dir = Path("data/query_processed")
+    query_files = sorted(query_dir.glob("*.wav"))
+    if query_files:
+        selected_query = st.selectbox(
+            "Danh sách file test",
+            options=query_files,
+            format_func=lambda p: p.name,
+        )
+        if st.button("🔍 Tìm kiếm", type="primary"):
+            query_audio_path = str(selected_query)
+    else:
+        st.warning("Không tìm thấy file test trong data/query_processed")
+else:
+    uploaded_file = st.file_uploader(
+        "📤 Upload audio file",
+        type=['wav', 'mp3', 'flac'],
+        help="Upload audio để tìm giọng tương đồng"
+    )
+    if uploaded_file is not None and st.button("🔍 Tìm kiếm", type="primary"):
+        temp_dir = Path("temp")
+        temp_dir.mkdir(exist_ok=True)
+        temp_path = temp_dir / "query.wav"
+        with open(temp_path, "wb") as f:
+            f.write(uploaded_file.read())
+        query_audio_path = str(temp_path)
+
+if query_audio_path:
     
     # Load audio
-    y_query, sr_query = librosa.load(str(temp_path))
+    y_query, sr_query = librosa.load(query_audio_path)
     
     # Extract query features
     with st.spinner('🔍 Đang phân tích...'):
-        query_features = feature_extractor.extract_from_file(str(temp_path))
-        results = search_system.search_similar(str(temp_path), top_k=top_k)
+        query_features = feature_extractor.extract_from_file(query_audio_path)
+        results = search_system.search_similar(query_audio_path, top_k=top_k)
     
     # Create tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -212,7 +236,7 @@ if uploaded_file:
         col_q1, col_q2 = st.columns([1, 2])
         
         with col_q1:
-            st.audio(str(temp_path))
+            st.audio(query_audio_path)
             st.metric("Duration", f"{len(y_query)/sr_query:.2f}s")
             st.metric("Sample Rate", f"{sr_query} Hz")
         
@@ -471,11 +495,11 @@ if uploaded_file:
                 """)
     
     # Cleanup
-    if temp_path.exists():
+    if temp_path is not None and temp_path.exists():
         temp_path.unlink()
 
 else:
-    st.info("👆 Upload audio file để bắt đầu phân tích")
+    st.info("👆 Chọn file test hoặc upload file, sau đó nhấn 'Tìm kiếm'")
     
     if system_ready:
         st.markdown("### 📈 Database Statistics")
