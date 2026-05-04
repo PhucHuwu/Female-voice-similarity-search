@@ -13,6 +13,8 @@ from src.vector_database.metadata_db import parse_processed_filename
 def run_retrieval_evaluation(
     query_dir: str = "data/query_processed",
     metadata_db_path: str = "database/metadata.db",
+    scaler_path: str = "database/scaler.pkl",
+    pca_path: str = "database/pca.pkl",
     top_k: int = 5,
     output_dir: str = "reports/retrieval",
 ) -> Dict:
@@ -25,7 +27,11 @@ def run_retrieval_evaluation(
     if not query_files:
         raise FileNotFoundError(f"No query files found in {query_dir}")
 
-    search_system = VoiceSimilaritySearch(metadata_db_path=metadata_db_path)
+    search_system = VoiceSimilaritySearch(
+        metadata_db_path=metadata_db_path,
+        scaler_path=scaler_path,
+        pca_path=pca_path,
+    )
 
     rows = []
     all_scores = []
@@ -93,6 +99,30 @@ def run_retrieval_evaluation(
     by_voice_csv = out_dir / "retrieval_hit_rate_by_voice.csv"
     by_voice.to_csv(by_voice_csv, index=False)
 
+    # Confusion matrix (query voice vs predicted top-1 voice)
+    top1_df = details_df[details_df["rank"] == 1].copy()
+    top1_df["query_voice"] = top1_df["query_voice"].fillna("unknown")
+    top1_df["result_voice"] = top1_df["result_voice"].fillna("unknown")
+
+    confusion_counts = pd.crosstab(
+        top1_df["query_voice"],
+        top1_df["result_voice"],
+        rownames=["query_voice"],
+        colnames=["predicted_top1_voice"],
+    )
+    confusion_counts_csv = out_dir / "confusion_matrix_counts.csv"
+    confusion_counts.to_csv(confusion_counts_csv)
+
+    confusion_normalized = pd.crosstab(
+        top1_df["query_voice"],
+        top1_df["result_voice"],
+        rownames=["query_voice"],
+        colnames=["predicted_top1_voice"],
+        normalize="index",
+    )
+    confusion_normalized_csv = out_dir / "confusion_matrix_normalized.csv"
+    confusion_normalized.to_csv(confusion_normalized_csv)
+
     summary = {
         "num_query_files": len(query_files),
         "top_k": top_k,
@@ -113,6 +143,8 @@ def run_retrieval_evaluation(
             "details_csv": str(details_csv),
             "per_query_csv": str(per_query_csv),
             "hit_rate_by_voice_csv": str(by_voice_csv),
+            "confusion_counts_csv": str(confusion_counts_csv),
+            "confusion_normalized_csv": str(confusion_normalized_csv),
         },
     }
 

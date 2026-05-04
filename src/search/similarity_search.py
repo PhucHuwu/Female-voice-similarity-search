@@ -10,6 +10,7 @@ from typing import List, Tuple, Optional, Dict
 from src.feature_extraction.extractor import AudioFeatureExtractor
 from src.vector_database.metadata_db import MetadataDB
 from src.search.sqlite_vector_search import SQLiteVectorSearch
+from src.search.feature_transform import FeatureTransform
 from src.utils.audio_utils import preprocess_audio
 
 
@@ -19,6 +20,8 @@ class VoiceSimilaritySearch:
     def __init__(
         self,
         metadata_db_path: str = "database/metadata.db",
+        scaler_path: str = "database/scaler.pkl",
+        pca_path: str = "database/pca.pkl",
         feature_dim: int = 52
     ):
         """
@@ -31,6 +34,8 @@ class VoiceSimilaritySearch:
         self.feature_extractor = AudioFeatureExtractor()
         self.metadata_db = MetadataDB(metadata_db_path)
         self.sqlite_vector_search = SQLiteVectorSearch(metadata_db_path)
+        self.feature_transform = FeatureTransform(scaler_path=scaler_path, pca_path=pca_path)
+        self.feature_transform.load()
     
     def search_similar(
         self,
@@ -55,6 +60,10 @@ class VoiceSimilaritySearch:
             query_features = self.feature_extractor.extract_all_features(query_audio)
         else:
             query_features = self.feature_extractor.extract_from_file(query_audio_path)
+
+        query_features = self.feature_transform.transform(
+            query_features.reshape(1, -1)
+        )[0]
         
         rows = self.sqlite_vector_search.search(query_features, top_k=top_k)
         return [
@@ -88,7 +97,9 @@ class VoiceSimilaritySearch:
 def search_similar(
     query_audio_path: str,
     top_k: int = 5,
-    metadata_db_path: str = "database/metadata.db"
+    metadata_db_path: str = "database/metadata.db",
+    scaler_path: str = "database/scaler.pkl",
+    pca_path: str = "database/pca.pkl",
 ) -> List[Tuple[str, float, float]]:
     """
     Convenience function for similarity search
@@ -97,12 +108,16 @@ def search_similar(
         query_audio_path: Path to query audio
         top_k: Number of results
         metadata_db_path: SQLite metadata DB path
+        scaler_path: StandardScaler path
+        pca_path: PCA path
         
     Returns:
         List of (file_path, similarity_score, distance) tuples
     """
     search_system = VoiceSimilaritySearch(
-        metadata_db_path=metadata_db_path
+        metadata_db_path=metadata_db_path,
+        scaler_path=scaler_path,
+        pca_path=pca_path,
     )
     
     return search_system.search_similar(query_audio_path, top_k=top_k)

@@ -530,6 +530,18 @@ else:
             st.dataframe(rank_df, use_container_width=True)
 
         outputs = s.get("outputs", {})
+        if outputs.get("confusion_normalized_csv") and os.path.exists(outputs["confusion_normalized_csv"]):
+            st.markdown("**Confusion Matrix (Top-1, normalized by query voice)**")
+            cm_df = pd.read_csv(outputs["confusion_normalized_csv"], index_col=0)
+            fig_cm = px.imshow(
+                cm_df,
+                labels=dict(x="Predicted top-1 voice", y="Query voice", color="Rate"),
+                color_continuous_scale="Blues",
+                aspect="auto",
+            )
+            fig_cm.update_layout(height=500)
+            st.plotly_chart(fig_cm, use_container_width=True)
+
         if outputs.get("summary_json") and os.path.exists(outputs["summary_json"]):
             with open(outputs["summary_json"], "r", encoding="utf-8") as f:
                 st.download_button(

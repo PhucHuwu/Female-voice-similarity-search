@@ -36,8 +36,8 @@ data/query_processed/*
 !data/query_processed/.gitkeep
 
 # Reports
-reports/retrieval/*
-!reports/retrieval/.gitkeep
+reports/*
+!reports/.gitkeep
 
 # Database
 database/*

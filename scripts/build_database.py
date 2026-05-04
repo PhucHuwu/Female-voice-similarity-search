@@ -1,6 +1,7 @@
 """Build SQLite database with metadata and feature vectors."""
 import sys
 from pathlib import Path
+import argparse
 sys.path.append(str(Path(__file__).parent.parent))
 
 import numpy as np
@@ -9,6 +10,7 @@ from tqdm import tqdm
 
 from src.feature_extraction.extractor import AudioFeatureExtractor
 from src.vector_database.metadata_db import MetadataDB, parse_processed_filename, load_video_catalog
+from src.search.feature_transform import FeatureTransform
 
 
 def build_database(
@@ -17,6 +19,10 @@ def build_database(
     metadata_db_path: str = "database/metadata.db",
     video_catalog_csv: str = "data/list_video.csv",
     min_required_files: int = 500,
+    scaler_output: str = "database/scaler.pkl",
+    pca_output: str = "database/pca.pkl",
+    pca_components: float = 0.98,
+    use_pca: bool = False,
 ):
     """
     Build complete database: extract features and save to SQLite
@@ -111,7 +117,23 @@ def build_database(
     np.save(features_output, features_array)
     print(f"Features saved to {features_output}")
 
+    # Fit transforms and transform features for retrieval
+    transform = FeatureTransform(scaler_path=scaler_output, pca_path=pca_output)
+    transformed_features = transform.fit(
+        features_array,
+        pca_components=pca_components if use_pca else None,
+    )
+    transform.save()
+    print(f"Scaler saved to {scaler_output}")
+    if use_pca:
+        print(f"PCA saved to {pca_output} (components={pca_components})")
+
     # Save metadata DB
+    transformed_dim = int(transformed_features.shape[1])
+    for i in range(len(metadata_records)):
+        metadata_records[i]["feature_dim"] = transformed_dim
+        metadata_records[i]["feature_vector"] = transformed_features[i]
+
     metadata_db = MetadataDB(metadata_db_path)
     metadata_db.clear_all()
     metadata_db.upsert_records(metadata_records)
@@ -133,5 +155,31 @@ def build_database(
     print("  streamlit run app/streamlit_app.py")
 
 
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Build SQLite voice database")
+    parser.add_argument("--processed-audio-dir", type=str, default="data/processed")
+    parser.add_argument("--features-output", type=str, default="database/features.npy")
+    parser.add_argument("--metadata-db-path", type=str, default="database/metadata.db")
+    parser.add_argument("--video-catalog-csv", type=str, default="data/list_video.csv")
+    parser.add_argument("--min-required-files", type=int, default=500)
+    parser.add_argument("--scaler-output", type=str, default="database/scaler.pkl")
+    parser.add_argument("--pca-output", type=str, default="database/pca.pkl")
+    parser.add_argument("--use-pca", action="store_true")
+    parser.add_argument("--pca-components", type=float, default=0.98)
+    args = parser.parse_args()
+
+    build_database(
+        processed_audio_dir=args.processed_audio_dir,
+        features_output=args.features_output,
+        metadata_db_path=args.metadata_db_path,
+        video_catalog_csv=args.video_catalog_csv,
+        min_required_files=args.min_required_files,
+        scaler_output=args.scaler_output,
+        pca_output=args.pca_output,
+        pca_components=args.pca_components,
+        use_pca=args.use_pca,
+    )
+
+
 if __name__ == "__main__":
-    build_database()
+    main()
