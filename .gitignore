@@ -28,10 +28,12 @@ data/raw/*
 data/chunks/*
 data/query_chunks/*
 data/processed/*
+data/query_processed/*
 !data/raw/.gitkeep
 !data/chunks/.gitkeep
 !data/query_chunks/.gitkeep
 !data/processed/.gitkeep
+!data/query_processed/.gitkeep
 
 # Database
 database/vectors/*
