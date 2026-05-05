@@ -21,9 +21,15 @@ Do repository hiện tại không đính kèm thông tin phân công theo thành
 
 ### 1.1 Tổng quan về hệ thống tìm kiếm âm thanh
 
-Sự phát triển của các nền tảng video, podcast và nội dung số làm gia tăng nhanh kho dữ liệu âm thanh. Trong bối cảnh đó, bài toán tìm kiếm theo nội dung (content-based retrieval) trở nên quan trọng, đặc biệt với dữ liệu giọng nói. Đề tài này tập trung xây dựng hệ thống tìm kiếm giọng nói phụ nữ, trong đó đầu vào là một file âm thanh truy vấn và đầu ra là 5 file có độ tương đồng cao nhất.
+Sự phát triển mạnh của các nền tảng video, podcast và mạng xã hội đã tạo ra lượng lớn dữ liệu âm thanh phi cấu trúc. Khác với dữ liệu văn bản có thể tìm bằng từ khóa, dữ liệu giọng nói đòi hỏi cơ chế tìm kiếm theo nội dung âm học. Vì vậy, các hệ thống truy hồi âm thanh dựa trên đặc trưng (content-based audio retrieval) ngày càng quan trọng trong những bài toán như tìm giọng tương tự, lọc dữ liệu theo người nói, hỗ trợ gắn nhãn bán tự động và tiền xử lý cho các hệ nhận dạng nâng cao.
 
-Hệ thống được thiết kế theo hướng kết hợp xử lý tín hiệu số và cơ sở dữ liệu đa phương tiện: âm thanh được chuyển thành vector đặc trưng 52 chiều, sau đó lưu trong CSDL SQLite cùng metadata để hỗ trợ truy vấn và quản trị.
+Trong bối cảnh đó, đề tài xây dựng một hệ thống tìm kiếm giọng nói phụ nữ với đầu vào là file truy vấn và đầu ra là danh sách top-5 mẫu giống nhất trong cơ sở dữ liệu. Trọng tâm của hệ thống không nằm ở nhận dạng ngôn ngữ hay phiên âm nội dung lời nói, mà tập trung vào mức độ tương đồng về đặc tính giọng: âm sắc, cao độ, phân bố phổ và động học tín hiệu. Cách tiếp cận này phù hợp với các tình huống cần so sánh chất giọng ngay cả khi nội dung phát âm khác nhau.
+
+Về nguyên lý, hệ thống vận hành theo chuỗi xử lý: âm thanh đầu vào được chuẩn hóa, trích xuất thành vector đặc trưng 52 chiều, sau đó ánh xạ vào không gian truy hồi để so khớp với các vector đã lưu trong CSDL. Độ giống được đo bằng cosine similarity, kết hợp cơ chế xếp hạng giảm dần để trả về top-k ứng viên. Đối với query dài, hệ thống sử dụng phân đoạn nhiều cửa sổ và tổng hợp điểm nhằm tăng độ ổn định trước nhiễu cục bộ.
+
+Về mặt kiến trúc dữ liệu, đề tài triển khai mô hình CSDL đa phương tiện theo hướng lai: dữ liệu âm thanh lưu trên hệ thống tệp, còn metadata và vector đặc trưng lưu trong SQLite. Thiết kế này bảo đảm đồng thời ba yêu cầu: (i) truy vết nguồn dữ liệu rõ ràng qua metadata, (ii) truy hồi nhanh theo vector nội dung, và (iii) thuận tiện tái lập thực nghiệm khi thay đổi thuật toán đặc trưng hoặc chiến lược tìm kiếm.
+
+Từ góc độ học thuật, hệ thống là một minh họa cụ thể cho việc tích hợp giữa xử lý tín hiệu số và quản trị dữ liệu đa phương tiện: tín hiệu thô được biến đổi thành biểu diễn có cấu trúc, lưu trữ có tổ chức và truy vấn định lượng bằng độ đo hình học trong không gian đặc trưng.
 
 ### 1.2 Mục tiêu nghiên cứu
 
@@ -256,7 +262,112 @@ Giá trị thông tin được phân tích theo từng nhóm như sau:
 
 Tổng thể, bộ 52 chiều được chọn theo nguyên tắc “đa góc nhìn”: mỗi nhóm nắm bắt một khía cạnh khác nhau của giọng nói, giúp giảm phụ thuộc vào một loại đặc trưng đơn lẻ.
 
-#### 3.3.3 Ma trận đặc trưng
+#### 3.3.3 Cách trích xuất cụ thể: thuật toán và công thức
+
+Để bảo đảm tính tái lập khoa học, phần này mô tả rõ cách hệ thống tạo từng nhóm đặc trưng từ tín hiệu đầu vào `x[n]`.
+
+**(1) Tiền xử lý theo frame trước khi trích đặc trưng**
+
+- Tín hiệu được lấy mẫu ở `sr = 16000` Hz.
+- Tín hiệu được chia thành các frame bằng cửa sổ FFT với `n_fft = 2048`, bước nhảy `hop_length = 512`.
+- Nhiều đặc trưng được tính theo từng frame, sau đó tổng hợp thống kê toàn đoạn.
+
+**(2) MFCC (26 chiều)**
+
+Thuật toán MFCC thực hiện theo chuỗi chuẩn:
+
+1. Tính phổ ngắn hạn bằng STFT.
+2. Áp dụng Mel filterbank lên phổ biên độ/công suất.
+3. Lấy log năng lượng trên thang Mel.
+4. Dùng DCT để thu 13 hệ số cepstral.
+
+Công thức cốt lõi:
+
+- STFT:
+  \[
+  X(m,k)=\sum_{n=0}^{N-1} x[n+mH]w[n]e^{-j2\pi kn/N}
+  \]
+- Log-Mel năng lượng (với bộ lọc Mel thứ i):
+  \[
+  E_i=\log\left(\sum_k |X(m,k)|^2\,M_i(k)\right)
+  \]
+- Cepstrum (MFCC):
+  \[
+  c_r=\sum_{i=1}^{B} E_i\cos\left(\frac{\pi r}{B}(i-0.5)\right),\; r=1..13
+  \]
+
+Hệ thống lấy `mean` và `std` theo thời gian cho 13 hệ số: `13 + 13 = 26` chiều.
+
+**(3) Pitch/F0 (4 chiều)**
+
+Hệ thống dùng `librosa.piptrack` (pitch tracking dựa trên đỉnh phổ theo từng frame):
+
+1. Từ phổ từng frame, tìm chỉ số tần số có biên độ lớn nhất.
+2. Giữ các giá trị F0 dương (loại frame vô thanh/không xác định pitch).
+3. Tính 4 thống kê: `mean`, `std`, `min`, `max`.
+
+Nếu tập pitch rỗng, vector pitch được gán về `0` để tránh lỗi NaN.
+
+**(4) Spectral features (6 chiều)**
+
+Từ phổ biên độ `M(k)` và tần số `f_k`:
+
+- Spectral centroid:
+  \[
+  Centroid = \frac{\sum_k f_k M(k)}{\sum_k M(k)}
+  \]
+- Spectral rolloff (ngưỡng 85% năng lượng):
+  \[
+  \sum_{k=1}^{k_r} M(k)=0.85\sum_k M(k)
+  \]
+  với `f_{k_r}` là rolloff.
+- Spectral bandwidth:
+  \[
+  Bandwidth=\sqrt{\frac{\sum_k (f_k-Centroid)^2M(k)}{\sum_k M(k)}}
+  \]
+
+Mỗi đặc trưng lấy `mean` và `std` theo frame: `3 x 2 = 6` chiều.
+
+**(5) Temporal features (4 chiều)**
+
+- Zero Crossing Rate (ZCR):
+  \[
+  ZCR=\frac{1}{2N}\sum_{n=1}^{N}|sign(x[n])-sign(x[n-1])|
+  \]
+- RMS energy:
+  \[
+  RMS=\sqrt{\frac{1}{N}\sum_{n=1}^{N}x[n]^2}
+  \]
+
+Mỗi đại lượng lấy `mean` và `std`: `2 x 2 = 4` chiều.
+
+**(6) Chroma (12 chiều)**
+
+Từ phổ STFT, năng lượng được chiếu lên 12 lớp cao độ (pitch classes: C, C#, ..., B). Hệ thống lấy trung bình theo thời gian cho từng lớp:
+
+\[
+Chroma_i = mean_t\big(C_i(t)\big),\; i=1..12
+\]
+
+Kết quả là vector 12 chiều.
+
+**(7) Ghép vector cuối cùng (52 chiều)**
+
+Vector đặc trưng cuối được nối theo thứ tự:
+
+\[
+\mathbf{f}=[\mathbf{f}_{MFCC}(26),\mathbf{f}_{Pitch}(4),\mathbf{f}_{Spectral}(6),\mathbf{f}_{Temporal}(4),\mathbf{f}_{Chroma}(12)]
+\]
+
+Tổng số chiều:
+
+\[
+26+4+6+4+12=52
+\]
+
+Như vậy, thư viện chỉ đóng vai trò hiện thực hóa phép tính; bản chất trích xuất vẫn dựa trên các thuật toán DSP chuẩn với công thức xác định.
+
+#### 3.3.4 Ma trận đặc trưng
 
 Trong quá trình build CSDL (`scripts/build_database.py`), các vector được tổ chức thành ma trận đặc trưng và xử lý theo pipeline:
 
